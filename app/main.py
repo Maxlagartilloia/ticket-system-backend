@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from app.database import Base, engine
-from app.routers import instituciones, tickets
+from app.routers import instituciones, tickets, usuarios
 
-# Crear tablas (si faltan)
+# Crear tablas si faltan
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -12,9 +12,13 @@ app = FastAPI(
 
 # Routers
 app.include_router(instituciones.router)
+app.include_router(usuarios.router)
 app.include_router(tickets.router)
 
 
 @app.get("/")
 def health():
-    return {"status": "OK", "service": "CopierMaster Tickets Backend"}
+    return {
+        "status": "OK",
+        "service": "CopierMaster Tickets Backend"
+    }
