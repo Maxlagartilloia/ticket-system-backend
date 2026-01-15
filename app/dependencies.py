@@ -1,32 +1,20 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from .database import get_db
-from .models import Usuario
-from .auth import decode_token
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer
+from jose import jwt
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+SECRET_KEY = "copiermaster_tickets_secret_2026_seguro"
+ALGORITHM = "HS256"
 
-
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
-    data = decode_token(token)
-    user = db.query(Usuario).filter(Usuario.id == data["user_id"]).first()
-
-    if not user:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-
-    return user
+security = HTTPBearer()
 
 
 def require_roles(*roles):
-    def role_checker(user=Depends(get_current_user)):
-        if user.rol not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No autorizado"
-            )
-        return user
-    return role_checker
+    def checker(token=Depends(security)):
+        try:
+            payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+            if payload.get("rol") not in roles:
+                raise HTTPException(status_code=403, detail="No autorizado")
+            return payload
+        except Exception:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    return checker
