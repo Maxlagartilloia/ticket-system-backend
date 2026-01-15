@@ -1,62 +1,31 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import psycopg2
-import bcrypt
-import os
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+from database import engine, Base, get_db
+from models import User
+from schemas import LoginRequest, TokenResponse
+from auth import verify_password, create_access_token
+from routers import tickets
 
-app = FastAPI(title="CopierMaster – Sistema de Soporte")
+app = FastAPI(title="CopierMaster – Support System")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class LoginRequest(BaseModel):
-    correo: str
-    password: str
+Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def health():
-    return {"status": "Backend activo"}
+    return {"status": "ok"}
 
-@app.post("/login")
-def login(data: LoginRequest):
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
+@app.post("/login", response_model=TokenResponse)
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or not verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        cur.execute("""
-            SELECT u.id, u.password_hash, r.nombre
-            FROM usuarios u
-            JOIN roles r ON u.rol_id = r.id
-            WHERE u.correo = %s
-        """, (data.correo,))
+    token = create_access_token({
+        "sub": user.email,
+        "role": user.role
+    })
 
-        user = cur.fetchone()
-        conn.close()
+    return {"access_token": token}
 
-        if not user:
-            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-
-        user_id, password_hash, rol = user
-
-        if not bcrypt.checkpw(
-            data.password.encode("utf-8"),
-            password_hash.encode("utf-8")
-        ):
-            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-
-        return {
-            "status": "ok",
-            "user_id": str(user_id),
-            "rol": rol
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+app.include_router(tickets.router)
