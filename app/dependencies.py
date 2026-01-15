@@ -1,137 +1,76 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from typing import List
+from jose import JWTError, jwt
 
 from app.database import get_db
-from app import models, schemas
+from app import models
 
-router = APIRouter()
+# =========================
+# CONFIG
+# =========================
+SECRET_KEY = "CHANGE_THIS_SECRET_KEY"
+ALGORITHM = "HS256"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 
 # =========================
-# CREATE INSTITUTION
+# GET CURRENT USER
 # =========================
-@router.post(
-    "/",
-    response_model=schemas.InstitutionOut,
-    status_code=status.HTTP_201_CREATED
-)
-def create_institution(
-    institution: schemas.InstitutionCreate,
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
-    existing = (
-        db.query(models.Institution)
-        .filter(models.Institution.name == institution.name)
-        .first()
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
     )
 
-    if existing:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int | None = payload.get("sub")
+
+        if user_id is None:
+            raise credentials_exception
+
+    except JWTError:
+        raise credentials_exception
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+
+    if user is None:
+        raise credentials_exception
+
+    return user
+
+
+# =========================
+# ROLE CHECKS
+# =========================
+def require_admin(user=Depends(get_current_user)):
+    if user.role != "admin":
         raise HTTPException(
-            status_code=400,
-            detail="Institution already exists"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
         )
-
-    new_institution = models.Institution(**institution.dict())
-    db.add(new_institution)
-    db.commit()
-    db.refresh(new_institution)
-
-    return new_institution
+    return user
 
 
-# =========================
-# LIST INSTITUTIONS
-# =========================
-@router.get(
-    "/",
-    response_model=List[schemas.InstitutionOut]
-)
-def list_institutions(db: Session = Depends(get_db)):
-    return db.query(models.Institution).order_by(models.Institution.name).all()
-
-
-# =========================
-# GET INSTITUTION BY ID
-# =========================
-@router.get(
-    "/{institution_id}",
-    response_model=schemas.InstitutionOut
-)
-def get_institution(
-    institution_id: int,
-    db: Session = Depends(get_db)
-):
-    institution = (
-        db.query(models.Institution)
-        .filter(models.Institution.id == institution_id)
-        .first()
-    )
-
-    if not institution:
+def require_supervisor(user=Depends(get_current_user)):
+    if user.role not in ["admin", "supervisor"]:
         raise HTTPException(
-            status_code=404,
-            detail="Institution not found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Supervisor access required"
         )
+    return user
 
-    return institution
 
-
-# =========================
-# UPDATE INSTITUTION
-# =========================
-@router.put(
-    "/{institution_id}",
-    response_model=schemas.InstitutionOut
-)
-def update_institution(
-    institution_id: int,
-    institution: schemas.InstitutionCreate,
-    db: Session = Depends(get_db)
-):
-    db_institution = (
-        db.query(models.Institution)
-        .filter(models.Institution.id == institution_id)
-        .first()
-    )
-
-    if not db_institution:
+def require_technician(user=Depends(get_current_user)):
+    if user.role not in ["admin", "supervisor", "technician"]:
         raise HTTPException(
-            status_code=404,
-            detail="Institution not found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Technician access required"
         )
-
-    for key, value in institution.dict().items():
-        setattr(db_institution, key, value)
-
-    db.commit()
-    db.refresh(db_institution)
-
-    return db_institution
-
-
-# =========================
-# DELETE INSTITUTION
-# =========================
-@router.delete(
-    "/{institution_id}",
-    status_code=status.HTTP_204_NO_CONTENT
-)
-def delete_institution(
-    institution_id: int,
-    db: Session = Depends(get_db)
-):
-    institution = (
-        db.query(models.Institution)
-        .filter(models.Institution.id == institution_id)
-        .first()
-    )
-
-    if not institution:
-        raise HTTPException(
-            status_code=404,
-            detail="Institution not found"
-        )
-
-    db.delete(institution)
-    db.commit()
+    return user
