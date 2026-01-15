@@ -1,20 +1,13 @@
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer
-from jose import jwt
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+from auth import SECRET_KEY, ALGORITHM
 
-SECRET_KEY = "copiermaster_tickets_secret_2026_seguro"
-ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
-security = HTTPBearer()
-
-
-def require_roles(*roles):
-    def checker(token=Depends(security)):
-        try:
-            payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-            if payload.get("rol") not in roles:
-                raise HTTPException(status_code=403, detail="No autorizado")
-            return payload
-        except Exception:
-            raise HTTPException(status_code=401, detail="Token inválido")
-    return checker
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
