@@ -4,35 +4,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from app.routers import (
     auth,
-    tickets,
-    instituciones,
     usuarios,
-    reportes,
+    instituciones,
+    tickets,
+    reportes
 )
 
 # =========================
-# DATABASE
+# DATABASE INIT
 # =========================
+
 Base.metadata.create_all(bind=engine)
 
 # =========================
-# APP
+# APP INIT
 # =========================
+
 app = FastAPI(
-    title="CopierMaster – Sistema de Soporte",
+    title="CopierMaster Ticket System",
     version="1.0.0"
 )
 
 # =========================
-# CORS (FRONTEND)
+# CORS CONFIG
 # =========================
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://soporte.copiermastercyg.com.ec",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-    ],
+    allow_origins=["*"],  # luego lo cerramos
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +40,7 @@ app.add_middleware(
 # =========================
 # ROUTERS
 # =========================
+
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(usuarios.router, prefix="/usuarios", tags=["Usuarios"])
 app.include_router(instituciones.router, prefix="/instituciones", tags=["Instituciones"])
@@ -48,8 +48,13 @@ app.include_router(tickets.router, prefix="/tickets", tags=["Tickets"])
 app.include_router(reportes.router, prefix="/reportes", tags=["Reportes"])
 
 # =========================
-# HEALTH CHECK
+# ROOT HEALTHCHECK
 # =========================
+
 @app.get("/")
 def root():
-    return {"status": "CopierMaster API running"}
+    return {
+        "status": "ok",
+        "service": "CopierMaster Backend",
+        "version": "1.0.0"
+    }
