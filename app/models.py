@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from .database import Base
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.sql import func
+from app.database import Base
+
 
 class Institucion(Base):
     __tablename__ = "instituciones"
@@ -9,10 +9,7 @@ class Institucion(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
     contrato = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    usuarios = relationship("Usuario", back_populates="institucion")
-    tickets = relationship("Ticket", back_populates="institucion")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Usuario(Base):
@@ -22,11 +19,9 @@ class Usuario(Base):
     nombre = Column(String, nullable=False)
     email = Column(String, unique=True, index=True)
     password = Column(String, nullable=False)
-    rol = Column(String, nullable=False)  # admin, supervisor, tecnico, cliente
+    rol = Column(String, nullable=False)
     institucion_id = Column(Integer, ForeignKey("instituciones.id"), nullable=True)
-
-    institucion = relationship("Institucion", back_populates="usuarios")
-    tickets = relationship("Ticket", back_populates="tecnico")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Ticket(Base):
@@ -38,7 +33,4 @@ class Ticket(Base):
     estado = Column(String, default="abierto")
     institucion_id = Column(Integer, ForeignKey("instituciones.id"))
     tecnico_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    institucion = relationship("Institucion", back_populates="tickets")
-    tecnico = relationship("Usuario", back_populates="tickets")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
