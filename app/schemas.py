@@ -2,12 +2,24 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
 
+
 # =========================
-# USERS
+# AUTH / USERS
 # =========================
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+
+
 class UserBase(BaseModel):
-    full_name: str
+    name: str
     email: EmailStr
     role: str  # admin | supervisor | technician | client
 
@@ -18,10 +30,11 @@ class UserCreate(UserBase):
 
 class UserOut(UserBase):
     id: int
+    is_active: bool
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # =========================
@@ -31,8 +44,6 @@ class UserOut(UserBase):
 class InstitutionBase(BaseModel):
     name: str
     address: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[EmailStr] = None
 
 
 class InstitutionCreate(InstitutionBase):
@@ -44,49 +55,7 @@ class InstitutionOut(InstitutionBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
-
-
-# =========================
-# DEPARTMENTS
-# =========================
-
-class DepartmentBase(BaseModel):
-    name: str
-    institution_id: int
-
-
-class DepartmentCreate(DepartmentBase):
-    pass
-
-
-class DepartmentOut(DepartmentBase):
-    id: int
-
-    class Config:
-        orm_mode = True
-
-
-# =========================
-# EQUIPMENT
-# =========================
-
-class EquipmentBase(BaseModel):
-    brand: str
-    model: str
-    serial_number: Optional[str] = None
-    department_id: int
-
-
-class EquipmentCreate(EquipmentBase):
-    pass
-
-
-class EquipmentOut(EquipmentBase):
-    id: int
-
-    class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # =========================
@@ -94,11 +63,10 @@ class EquipmentOut(EquipmentBase):
 # =========================
 
 class TicketBase(BaseModel):
-    title: str
+    institution_id: int
+    equipment: str
     description: str
     priority: str  # low | medium | high
-    institution_id: int
-    equipment_id: int
 
 
 class TicketCreate(TicketBase):
@@ -106,30 +74,27 @@ class TicketCreate(TicketBase):
 
 
 class TicketUpdate(BaseModel):
-    status: Optional[str] = None           # open | in_progress | closed
     technician_id: Optional[int] = None
+    status: Optional[str] = None  # open | in_progress | closed
+    priority: Optional[str] = None
 
 
 class TicketOut(TicketBase):
     id: int
     status: str
-    technician_id: Optional[int]
     created_at: datetime
+    technician_id: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # =========================
-# AUTH
+# REPORTS (BASIC)
 # =========================
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
+class DashboardStats(BaseModel):
+    open_tickets: int
+    in_progress: int
+    resolved_today: int
+    institutions: int
