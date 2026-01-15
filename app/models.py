@@ -1,37 +1,140 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    ForeignKey,
+    DateTime
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.database import Base
 
-class Usuario(Base):
-    __tablename__ = "usuarios"
+
+# =========================
+# USERS
+# =========================
+
+class User(Base):
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
+    full_name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    rol = Column(String, nullable=False)  # admin | supervisor | tecnico
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # admin | supervisor | technician | client
 
-    tickets_asignados = relationship("Ticket", back_populates="tecnico")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    assigned_tickets = relationship("Ticket", back_populates="technician")
 
 
-class Institucion(Base):
-    __tablename__ = "instituciones"
+# =========================
+# INSTITUTIONS
+# =========================
+
+class Institution(Base):
+    __tablename__ = "institutions"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, unique=True, nullable=False)
+    name = Column(String, unique=True, nullable=False)
+    address = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
 
-    tickets = relationship("Ticket", back_populates="institucion")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    departments = relationship(
+        "Department",
+        back_populates="institution",
+        cascade="all, delete-orphan"
+    )
+
+
+# =========================
+# DEPARTMENTS
+# =========================
+
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+
+    institution_id = Column(
+        Integer,
+        ForeignKey("institutions.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    institution = relationship("Institution", back_populates="departments")
+
+    equipments = relationship(
+        "Equipment",
+        back_populates="department",
+        cascade="all, delete-orphan"
+    )
+
+
+# =========================
+# EQUIPMENT
+# =========================
+
+class Equipment(Base):
+    __tablename__ = "equipments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    brand = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    serial_number = Column(String, nullable=True)
+
+    department_id = Column(
+        Integer,
+        ForeignKey("departments.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    department = relationship("Department", back_populates="equipments")
+
+    tickets = relationship("Ticket", back_populates="equipment")
+
+
+# =========================
+# TICKETS
+# =========================
 
 class Ticket(Base):
     __tablename__ = "tickets"
 
     id = Column(Integer, primary_key=True, index=True)
-    descripcion = Column(Text, nullable=False)
-    prioridad = Column(String, default="baja")
-    estado = Column(String, default="abierto")
 
-    institucion_id = Column(Integer, ForeignKey("instituciones.id"))
-    tecnico_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
 
-    institucion = relationship("Institucion", back_populates="tickets")
-    tecnico = relationship("Usuario", back_populates="tickets_asignados")
+    priority = Column(String, default="medium")  # low | medium | high
+    status = Column(String, default="open")      # open | in_progress | closed
+
+    institution_id = Column(
+        Integer,
+        ForeignKey("institutions.id"),
+        nullable=False
+    )
+
+    equipment_id = Column(
+        Integer,
+        ForeignKey("equipments.id"),
+        nullable=False
+    )
+
+    technician_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    institution = relationship("Institution")
+    equipment = relationship("Equipment", back_populates="tickets")
+    technician = relationship("User", back_populates="assigned_tickets")
