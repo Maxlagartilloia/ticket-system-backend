@@ -1,16 +1,22 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
 from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+import os
 
 from app.database import get_db
-from app import models
+from app.models import User
 
 # =========================
 # CONFIG
 # =========================
-SECRET_KEY = "CHANGE_THIS_SECRET_KEY"
+
+# Estas variables SE DEFINEN EN RENDER (Environment Variables)
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not set in environment variables")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -21,7 +27,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-):
+) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -31,15 +37,12 @@ def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int | None = payload.get("sub")
-
         if user_id is None:
             raise credentials_exception
-
     except JWTError:
         raise credentials_exception
 
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
 
@@ -47,30 +50,30 @@ def get_current_user(
 
 
 # =========================
-# ROLE CHECKS
+# ROLE GUARDS
 # =========================
-def require_admin(user=Depends(get_current_user)):
-    if user.role != "admin":
+def require_admin(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
+            detail="Admin privileges required"
         )
-    return user
+    return current_user
 
 
-def require_supervisor(user=Depends(get_current_user)):
-    if user.role not in ["admin", "supervisor"]:
+def require_supervisor(current_user: User = Depends(get_current_user)):
+    if current_user.role not in ["admin", "supervisor"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Supervisor access required"
+            detail="Supervisor privileges required"
         )
-    return user
+    return current_user
 
 
-def require_technician(user=Depends(get_current_user)):
-    if user.role not in ["admin", "supervisor", "technician"]:
+def require_technician(current_user: User = Depends(get_current_user)):
+    if current_user.role != "technician":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Technician access required"
+            detail="Technician privileges required"
         )
-    return user
+    return current_user
