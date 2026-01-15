@@ -13,7 +13,6 @@ router = APIRouter(
 )
 
 
-# 🔹 Crear institución (ADMIN / SUPERVISOR)
 @router.post(
     "/",
     response_model=InstitucionOut,
@@ -30,7 +29,6 @@ def crear_institucion(
     return institucion
 
 
-# 🔹 Listar todas las instituciones (ADMIN / SUPERVISOR)
 @router.get(
     "/",
     response_model=List[InstitucionOut],
@@ -40,7 +38,6 @@ def listar_instituciones(db: Session = Depends(get_db)):
     return db.query(Institucion).order_by(Institucion.id).all()
 
 
-# 🔹 Obtener una institución por ID
 @router.get(
     "/{institucion_id}",
     response_model=InstitucionOut,
