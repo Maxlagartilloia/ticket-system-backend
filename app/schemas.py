@@ -1,27 +1,45 @@
 from pydantic import BaseModel
+from typing import Optional
 
-# ---------- AUTH ----------
-
-class LoginRequest(BaseModel):
+# -------- USUARIOS --------
+class UsuarioCreate(BaseModel):
+    nombre: str
     email: str
-    password: str
+    rol: str
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-# ---------- TICKETS ----------
-
-class TicketCreate(BaseModel):
-    institution: str
-    equipment: str
-    description: str
-    priority: str
-
-class TicketResponse(TicketCreate):
+class UsuarioOut(UsuarioCreate):
     id: int
-    status: str
-    technician: str | None
+    class Config:
+        orm_mode = True
+
+
+# -------- INSTITUCIONES --------
+class InstitucionCreate(BaseModel):
+    nombre: str
+
+class InstitucionOut(InstitucionCreate):
+    id: int
+    class Config:
+        orm_mode = True
+
+
+# -------- TICKETS --------
+class TicketCreate(BaseModel):
+    descripcion: str
+    prioridad: str
+    institucion_id: int
+
+class TicketUpdate(BaseModel):
+    estado: Optional[str] = None
+    tecnico_id: Optional[int] = None
+
+class TicketOut(BaseModel):
+    id: int
+    descripcion: str
+    prioridad: str
+    estado: str
+    institucion_id: int
+    tecnico_id: Optional[int]
 
     class Config:
         orm_mode = True
