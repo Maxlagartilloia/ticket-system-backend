@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status
 
 SECRET_KEY = "copiermaster_tickets_secret_2026_seguro"
 ALGORITHM = "HS256"
@@ -19,24 +18,9 @@ def verify_password(plain_password, hashed_password) -> bool:
 
 
 def create_access_token(user_id: int, rol: str):
-    expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    to_encode = {
+    payload = {
         "sub": str(user_id),
         "rol": rol,
-        "exp": expire
+        "exp": datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     }
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-
-def decode_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return {
-            "user_id": int(payload.get("sub")),
-            "rol": payload.get("rol")
-        }
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado"
-        )
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
