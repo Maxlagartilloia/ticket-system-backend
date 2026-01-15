@@ -1,36 +1,23 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.sql import func
-from app.database import Base
+from database import Base
 
-
-class Institucion(Base):
-    __tablename__ = "instituciones"
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    contrato = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
-class Usuario(Base):
-    __tablename__ = "usuarios"
+class User(Base):
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
-    rol = Column(String, nullable=False)
-    institucion_id = Column(Integer, ForeignKey("instituciones.id"), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    role = Column(String, default="supervisor")
 
 class Ticket(Base):
     __tablename__ = "tickets"
 
     id = Column(Integer, primary_key=True, index=True)
-    titulo = Column(String, nullable=False)
-    descripcion = Column(Text)
-    estado = Column(String, default="abierto")
-    institucion_id = Column(Integer, ForeignKey("instituciones.id"))
-    tecnico_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    institution = Column(String, nullable=False)
+    equipment = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(String, default="open")
+    priority = Column(String, default="medium")
+    technician = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
