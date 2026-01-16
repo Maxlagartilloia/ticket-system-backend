@@ -14,12 +14,14 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False)  # admin | supervisor | technician | client
+    role = Column(String(50), nullable=False)  # admin | technician | supervisor | client
     is_active = Column(Boolean, default=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
 
-    # Relaciones acopladas con Ticket
-    tickets_created = relationship("Ticket", back_populates="created_by_user", foreign_keys="[Ticket.created_by]")
-    tickets_assigned = relationship("Ticket", back_populates="assigned_technician", foreign_keys="[Ticket.assigned_to]")
+    # Relationships
+    institution = relationship("Institution", back_populates="users")
+    tickets_created = relationship("User", back_populates="created_by_user", foreign_keys="[Ticket.created_by]")
+    tickets_assigned = relationship("User", back_populates="assigned_technician", foreign_keys="[Ticket.assigned_to]")
 
 
 # =========================
@@ -31,10 +33,11 @@ class Institution(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     address = Column(String(255))
-    contact_email = Column(String(255))
-    contact_phone = Column(String(50))
+    phone = Column(String(50))
     is_active = Column(Boolean, default=True)
 
+    # Relationships
+    users = relationship("User", back_populates="institution")
     departments = relationship("Department", back_populates="institution")
     tickets = relationship("Ticket", back_populates="institution")
 
@@ -49,6 +52,7 @@ class Department(Base):
     name = Column(String(255), nullable=False)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False)
 
+    # Relationships
     institution = relationship("Institution", back_populates="departments")
     equipment = relationship("Equipment", back_populates="department")
 
@@ -65,6 +69,7 @@ class Equipment(Base):
     serial_number = Column(String(255))
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
 
+    # Relationships
     department = relationship("Department", back_populates="equipment")
     tickets = relationship("Ticket", back_populates="equipment")
 
@@ -90,9 +95,9 @@ class Ticket(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # Relationships
     institution = relationship("Institution", back_populates="tickets")
     equipment = relationship("Equipment", back_populates="tickets")
     
-    # Especificación explícita de foreign_keys para evitar ambigüedad en User
     created_by_user = relationship("User", foreign_keys=[created_by], back_populates="tickets_created")
     assigned_technician = relationship("User", foreign_keys=[assigned_to], back_populates="tickets_assigned")
