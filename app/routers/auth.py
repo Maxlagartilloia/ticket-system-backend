@@ -13,11 +13,15 @@ router = APIRouter(
     tags=["Auth"]
 )
 
+# Configuración de Hash para contraseñas (BCRYPT)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 horas
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
 def create_access_token(user_id: int, role: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -33,10 +37,12 @@ def login(
     credentials: schemas.LoginRequest,
     db: Session = Depends(get_db)
 ):
+    # Buscar usuario por email
     user = db.query(models.User).filter(
         models.User.email == credentials.email
     ).first()
 
+    # Validar existencia y contraseña
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -49,6 +55,7 @@ def login(
             detail="User inactive"
         )
 
+    # Generar Token JWT
     token = create_access_token(user.id, user.role)
 
     return {
