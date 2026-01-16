@@ -39,17 +39,45 @@ app.add_middleware(
 # =========================
 # ROUTERS
 # =========================
-# 🔴 IMPORTANTE:
-# auth.router YA TIENE prefix="/auth" definido internamente
-# NO se debe volver a poner aquí
 
-app.include_router(auth.router, tags=["Auth"])
-app.include_router(usuarios.router, prefix="/usuarios", tags=["Usuarios"])
-app.include_router(instituciones.router, prefix="/instituciones", tags=["Institutions"])
-app.include_router(departments.router, prefix="/departments", tags=["Departments"])
-app.include_router(equipment.router, prefix="/equipment", tags=["Equipment"])
-app.include_router(tickets.router, prefix="/tickets", tags=["Tickets"])
-app.include_router(reportes.router, prefix="/reportes", tags=["Reports"])
+# 🔑 AUTH (IMPORTANTE: el prefix VA SOLO AQUÍ)
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+
+app.include_router(
+    usuarios.router,
+    prefix="/usuarios",
+    tags=["Usuarios"]
+)
+
+app.include_router(
+    instituciones.router,
+    prefix="/instituciones",
+    tags=["Institutions"]
+)
+
+app.include_router(
+    departments.router,
+    prefix="/departments",
+    tags=["Departments"]
+)
+
+app.include_router(
+    equipment.router,
+    prefix="/equipment",
+    tags=["Equipment"]
+)
+
+app.include_router(
+    tickets.router,
+    prefix="/tickets",
+    tags=["Tickets"]
+)
+
+app.include_router(
+    reportes.router,
+    prefix="/reportes",
+    tags=["Reports"]
+)
 
 # =========================
 # HEALTHCHECK
