@@ -1,21 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import Base, engine
+from app.database import engine, Base
+from app.routers import auth, users, tickets, equipment, institutions, departments
 
-# Importaciones absolutas para garantizar el acoplamiento total
-from app.routers.auth import router as auth_router
-from app.routers.usuarios import router as usuarios_router
-from app.routers.tickets import router as tickets_router
-from app.routers.departments import router as departments_router
-from app.routers.equipment import router as equipment_router
-from app.routers.instituciones import router as instituciones_router
-from app.routers.reportes import router as reportes_router
-
-# Sincronizar tablas (confirmado con tu DBeaver)
+# ==========================================
+# DATABASE INITIALIZATION (Render Auto-Sync)
+# ==========================================
+# Esto crea las tablas en PostgreSQL si no existen al arrancar
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="CopierMaster API", docs_url="/docs")
+# ==========================================
+# APP CONFIGURATION
+# ==========================================
+app = FastAPI(
+    title="CopierMaster API",
+    description="Professional Ticketing System for Technical Services",
+    version="1.0.0"
+)
 
+# Configuración de CORS para permitir que el Frontend se conecte
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,15 +27,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registro de rutas: Esto activa /auth/login, /usuarios, etc.
-app.include_router(auth_router)
-app.include_router(usuarios_router)
-app.include_router(tickets_router)
-app.include_router(departments_router)
-app.include_router(equipment_router)
-app.include_router(instituciones_router)
-app.include_router(reportes_router)
+# ==========================================
+# ROUTER REGISTRATION
+# ==========================================
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(institutions.router)
+app.include_router(departments.router, prefix="/departments", tags=["Departments"])
+app.include_router(equipment.router)
+app.include_router(tickets.router)
 
 @app.get("/")
-def root():
-    return {"status": "online", "message": "Backend de CopierMaster operando"}
+def read_root():
+    return {
+        "status": "online",
+        "system": "CopierMaster API",
+        "environment": "Production/Render"
+    }
