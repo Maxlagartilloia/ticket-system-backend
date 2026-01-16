@@ -24,6 +24,8 @@ class UserBase(BaseModel):
     full_name: str
     email: EmailStr
     role: str
+    institution_id: Optional[int] = None
+    # institution_id es obligatorio SOLO para clientes (validado en router)
 
 
 class UserCreate(UserBase):
@@ -116,12 +118,16 @@ class TicketUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     assigned_to: Optional[int] = None
+    # Este schema se deja preparado para el siguiente ajuste de router
 
 
 class TicketOut(TicketBase):
     id: int
     status: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
+    created_by: int
+    assigned_to: Optional[int] = None
 
     class Config:
         from_attributes = True
