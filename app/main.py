@@ -1,19 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-# Importamos los modelos para que Base los conozca antes de crear las tablas
 from app import models
 from app.routers import auth, users, tickets, institutions, departments, equipment, reports
 
-# Crea las tablas en la base de datos de Render
+# Crea las tablas automáticamente
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CopierMaster API")
 
-# Configuración de CORS para tu dominio de Netlify
+# 🛡️ CONFIGURACIÓN CORS BLINDADA
+# Esto permite que tanto el dominio principal como el de soporte funcionen
+origins = [
+    "https://copiermastercyg.com.ec",
+    "https://www.copiermastercyg.com.ec",
+    "https://soporte.copiermastercyg.com.ec",
+    "http://localhost:3000", # Para tus pruebas locales
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://copiermastercyg.com.ec", "http://localhost:3000"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,4 +37,4 @@ app.include_router(reports.router)
 
 @app.get("/")
 def root():
-    return {"message": "CopierMaster Backend is Live"}
+    return {"message": "CopierMaster Backend is Live and Secure"}
