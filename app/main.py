@@ -9,17 +9,11 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CopierMaster API")
 
-# 🛡️ LISTA DE ACCESO TOTAL PARA TUS DOMINIOS
-origins = [
-    "https://copiermastercyg.com.ec",
-    "https://www.copiermastercyg.com.ec",
-    "https://soporte.copiermastercyg.com.ec", # Autorizamos el subdominio de soporte
-    "http://localhost:3000"
-]
-
+# 🛡️ CONFIGURACIÓN CORS TOTAL
+# Usamos "*" para asegurar que el subdominio 'soporte' no sea rechazado por el navegador
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,4 +29,5 @@ app.include_router(reports.router)
 
 @app.get("/")
 def root():
-    return {"message": "CopierMaster Backend Live"}
+    # 🚩 CAMBIAMOS ESTE MENSAJE PARA CONFIRMAR EL DEPLOY
+    return {"status": "V3 - Acceso Global Activado"}
