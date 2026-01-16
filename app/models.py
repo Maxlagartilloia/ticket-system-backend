@@ -10,6 +10,7 @@ class Institution(Base):
     name = Column(String, nullable=False)
     address = Column(String)
     phone = Column(String)
+    is_active = Column(Boolean, default=True) # Añadido para Soft Delete
 
     # Relaciones
     users = relationship("User", back_populates="institution")
@@ -46,6 +47,9 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="technician") # 'admin', 'supervisor', 'technician', 'client'
     is_active = Column(Boolean, default=True)
+    
+    # 🚨 CAMBIO CRÍTICO: nullable=True permite que el login funcione aunque la columna
+    # sea nueva o falte en registros antiguos durante la migración de Render.
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
 
     institution = relationship("Institution", back_populates="users")
