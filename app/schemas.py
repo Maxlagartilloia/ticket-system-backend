@@ -77,6 +77,27 @@ class DepartmentOut(DepartmentBase):
 
 
 # =========================
+# EQUIPMENT
+# =========================
+class EquipmentBase(BaseModel):
+    name: str
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    department_id: int
+
+
+class EquipmentCreate(EquipmentBase):
+    pass
+
+
+class EquipmentOut(EquipmentBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+# =========================
 # TICKETS
 # =========================
 class TicketBase(BaseModel):
