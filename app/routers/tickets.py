@@ -46,7 +46,7 @@ def create_ticket(
             detail="Institution not found or inactive"
         )
 
-    # 2. Validar equipment si se proporciona
+    # 2. Validar equipo si se proporciona
     final_equipment_id = None
     if payload.equipment_id:
         equipment = (
@@ -61,7 +61,7 @@ def create_ticket(
                 detail="Equipment not found"
             )
 
-        # 3. Validar pertenencia del equipo a la institución (vía departamento)
+        # 3. Validar pertenencia del equipo a la institución
         department = (
             db.query(models.Department)
             .filter(models.Department.id == equipment.department_id)
@@ -76,7 +76,7 @@ def create_ticket(
         
         final_equipment_id = equipment.id
 
-    # 4. Crear instancia del modelo
+    # 4. Crear instancia según ADN
     new_ticket = models.Ticket(
         title=payload.title,
         description=payload.description,
@@ -84,8 +84,7 @@ def create_ticket(
         status="open",
         institution_id=payload.institution_id,
         equipment_id=final_equipment_id,
-        created_by=current_user.id,
-        assigned_to=None
+        created_by=current_user.id
     )
 
     db.add(new_ticket)
@@ -108,17 +107,15 @@ def list_tickets(
 ):
     query = db.query(models.Ticket)
 
-    # Filtros según el rol del usuario
+    # Filtros de seguridad por rol
     if current_user.role in ["admin", "supervisor"]:
-        # Ven todo el histórico
         return query.order_by(models.Ticket.created_at.desc()).all()
 
     if current_user.role == "technician":
-        # Solo ven tickets asignados a ellos
         return query.filter(models.Ticket.assigned_to == current_user.id)\
                     .order_by(models.Ticket.created_at.desc()).all()
 
-    # Clientes solo ven los tickets que ellos mismos crearon
+    # Clientes solo ven sus propios tickets
     return query.filter(models.Ticket.created_by == current_user.id)\
                 .order_by(models.Ticket.created_at.desc()).all()
 
@@ -144,7 +141,7 @@ def assign_technician(
     if ticket.status == "closed":
         raise HTTPException(status_code=400, detail="Cannot assign a closed ticket")
 
-    # Validar que el técnico existe y es apto
+    # Validar técnico apto
     technician = db.query(models.User).filter(
         models.User.id == technician_id,
         models.User.role == "technician",
@@ -175,19 +172,20 @@ def update_ticket_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if status_value not in ["open", "in_progress", "closed"]:
-        raise HTTPException(status_code=400, detail="Invalid status value")
+    valid_statuses = ["open", "in_progress", "closed"]
+    if status_value not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of {valid_statuses}")
 
     ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    # Restricción: El técnico solo puede actualizar sus propios tickets asignados
+    # Técnicos solo sus asignados
     if current_user.role == "technician" and ticket.assigned_to != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this ticket")
 
-    # Restricción: Clientes no pueden cambiar el estado del ticket
+    # Clientes bloqueados
     if current_user.role == "client":
         raise HTTPException(status_code=403, detail="Clients cannot modify ticket status")
 
