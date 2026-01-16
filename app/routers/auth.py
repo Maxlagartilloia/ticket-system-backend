@@ -9,18 +9,13 @@ from app import models, schemas
 from app.dependencies import SECRET_KEY, ALGORITHM
 
 router = APIRouter(
+    prefix="/auth",
     tags=["Auth"]
 )
 
-# =========================
-# PASSWORD CONFIG
-# =========================
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 horas
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-# =========================
-# UTILS
-# =========================
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -33,10 +28,7 @@ def create_access_token(user_id: int, role: str) -> str:
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-# =========================
-# LOGIN
-# =========================
-@router.post("/auth/login", response_model=schemas.TokenResponse)
+@router.post("/login", response_model=schemas.TokenResponse)
 def login(
     credentials: schemas.LoginRequest,
     db: Session = Depends(get_db)
@@ -64,4 +56,3 @@ def login(
         "token_type": "bearer",
         "role": user.role
     }
-
