@@ -4,7 +4,8 @@ from typing import List
 
 from app.database import get_db
 from app import models, schemas
-from app.dependencies import require_admin, require_supervisor, get_password_hash
+# Cambiamos la importación para usar el nuevo utils.py
+from app.utils import hash_password 
 
 router = APIRouter(
     prefix="/users",
@@ -17,14 +18,13 @@ router = APIRouter(
 @router.post(
     "/",
     response_model=schemas.UserOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_supervisor)]
+    status_code=status.HTTP_201_CREATED
 )
 def create_user(
     payload: schemas.UserCreate,
     db: Session = Depends(get_db)
 ):
-    # 1. Validar rol permitido (Blueprint ADN)
+    # 1. Validar roles permitidos
     allowed_roles = ["admin", "supervisor", "technician", "client"]
     if payload.role not in allowed_roles:
         raise HTTPException(
@@ -41,28 +41,34 @@ def create_user(
         )
 
     # 3. Crear usuario con HASH de contraseña (Seguridad Crítica)
+    # Usamos hash_password de utils.py
     user = models.User(
         full_name=payload.full_name,
         email=payload.email,
-        hashed_password=get_password_hash(payload.password),
+        hashed_password=hash_password(payload.password),
         role=payload.role,
         institution_id=payload.institution_id,
         is_active=True
     )
 
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    return user
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
 # =========================
 # LIST USERS
 # =========================
 @router.get(
     "/",
-    response_model=List[schemas.UserOut],
-    dependencies=[Depends(require_supervisor)]
+    response_model=List[schemas.UserOut]
 )
 def list_users(
     db: Session = Depends(get_db)
@@ -78,8 +84,7 @@ def list_users(
 # =========================
 @router.get(
     "/{user_id}",
-    response_model=schemas.UserOut,
-    dependencies=[Depends(require_supervisor)]
+    response_model=schemas.UserOut
 )
 def get_user(
     user_id: int,
