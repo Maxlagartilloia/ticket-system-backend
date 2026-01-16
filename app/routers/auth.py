@@ -5,10 +5,9 @@ from datetime import timedelta
 from app.database import get_db
 from app.models import User
 from app.utils import verify_password, create_access_token
-import os
 
 # Configuración de seguridad
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # El token durará 24 horas
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 router = APIRouter(
     prefix="/auth",
@@ -35,14 +34,14 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # 4. Crear el token de acceso
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role},
+        data={"sub": user.email, "role": user.role or "admin"},
         expires_delta=access_token_expires
     )
 
-    # 5. Retornar el token y los datos del usuario para el Frontend
+    # 5. Retornar datos con protección "OR" (Esto evita el Error 500 si falta un dato)
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "role": user.role,
-        "full_name": user.full_name
+        "role": user.role or "admin",
+        "full_name": user.full_name or "Admin CopierMaster"
     }
