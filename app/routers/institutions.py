@@ -4,7 +4,7 @@ from typing import List
 
 from app.database import get_db
 from app import models, schemas
-from app.dependencies import require_supervisor
+# Eliminamos la importación de dependencies para evitar errores circulares
 
 router = APIRouter(
     prefix="/institutions",
@@ -17,8 +17,7 @@ router = APIRouter(
 @router.post(
     "/",
     response_model=schemas.InstitutionOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_supervisor)]
+    status_code=status.HTTP_201_CREATED
 )
 def create_institution(
     payload: schemas.InstitutionCreate,
@@ -28,8 +27,7 @@ def create_institution(
     existing = (
         db.query(models.Institution)
         .filter(
-            models.Institution.name == payload.name,
-            models.Institution.is_active == True
+            models.Institution.name == payload.name
         )
         .first()
     )
@@ -40,12 +38,11 @@ def create_institution(
             detail="Institution already exists"
         )
 
-    # 2. Crear nueva institución (incluyendo el campo phone del ADN)
+    # 2. Crear nueva institución
     new_institution = models.Institution(
         name=payload.name,
         address=payload.address,
-        phone=payload.phone,
-        is_active=True
+        phone=payload.phone
     )
 
     db.add(new_institution)
@@ -56,19 +53,17 @@ def create_institution(
 
 
 # =========================
-# LIST INSTITUTIONS (ONLY ACTIVE)
+# LIST INSTITUTIONS
 # =========================
 @router.get(
     "/",
-    response_model=List[schemas.InstitutionOut],
-    dependencies=[Depends(require_supervisor)]
+    response_model=List[schemas.InstitutionOut]
 )
 def list_institutions(
     db: Session = Depends(get_db)
 ):
     return (
         db.query(models.Institution)
-        .filter(models.Institution.is_active == True)
         .order_by(models.Institution.name.asc())
         .all()
     )
@@ -79,8 +74,7 @@ def list_institutions(
 # =========================
 @router.get(
     "/{institution_id}",
-    response_model=schemas.InstitutionOut,
-    dependencies=[Depends(require_supervisor)]
+    response_model=schemas.InstitutionOut
 )
 def get_institution(
     institution_id: int,
@@ -88,17 +82,14 @@ def get_institution(
 ):
     institution = (
         db.query(models.Institution)
-        .filter(
-            models.Institution.id == institution_id,
-            models.Institution.is_active == True
-        )
+        .filter(models.Institution.id == institution_id)
         .first()
     )
 
     if not institution:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Institution not found or inactive"
+            detail="Institution not found"
         )
 
     return institution
@@ -109,8 +100,7 @@ def get_institution(
 # =========================
 @router.put(
     "/{institution_id}",
-    response_model=schemas.InstitutionOut,
-    dependencies=[Depends(require_supervisor)]
+    response_model=schemas.InstitutionOut
 )
 def update_institution(
     institution_id: int,
@@ -119,10 +109,7 @@ def update_institution(
 ):
     db_institution = (
         db.query(models.Institution)
-        .filter(
-            models.Institution.id == institution_id,
-            models.Institution.is_active == True
-        )
+        .filter(models.Institution.id == institution_id)
         .first()
     )
 
@@ -143,12 +130,11 @@ def update_institution(
 
 
 # =========================
-# DELETE INSTITUTION (SOFT DELETE)
+# DELETE INSTITUTION (HARD DELETE PARA LIMPIEZA)
 # =========================
 @router.delete(
     "/{institution_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_supervisor)]
+    status_code=status.HTTP_204_NO_CONTENT
 )
 def delete_institution(
     institution_id: int,
@@ -156,10 +142,7 @@ def delete_institution(
 ):
     institution = (
         db.query(models.Institution)
-        .filter(
-            models.Institution.id == institution_id,
-            models.Institution.is_active == True
-        )
+        .filter(models.Institution.id == institution_id)
         .first()
     )
 
@@ -169,6 +152,6 @@ def delete_institution(
             detail="Institution not found"
         )
 
-    # Soft Delete: Desactivar en lugar de borrar físicamente
-    institution.is_active = False
+    db.delete(institution)
     db.commit()
+    return None
