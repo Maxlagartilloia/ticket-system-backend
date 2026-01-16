@@ -3,26 +3,23 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# 🔒 SEGURIDAD TOTAL: 
-# Extraemos la conexión de las variables de entorno. 
-# En Supabase la encontrarás como "Connection String" (URI).
+# 🔒 Toma la URL de Supabase desde las variables de Netlify
+# Esto evita exponer tu contraseña en GitHub
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Verificación para asegurar que la app no arranque a ciegas
 if not SQLALCHEMY_DATABASE_URL:
-    raise ValueError("ERROR: No se encontró la variable DATABASE_URL. Configúrala en tu plataforma de despliegue.")
+    raise ValueError("ERROR: DATABASE_URL no encontrada en el entorno.")
 
-# Optimizamos la conexión para Supabase (PostgreSQL)
+# Configuración optimizada para Supabase
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,  # Verifica que la conexión esté viva antes de usarla
-    pool_recycle=3600    # Recicla conexiones cada hora para evitar cortes
+    pool_pre_ping=True,
+    pool_recycle=3600
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Dependencia para los routers
 def get_db():
     db = SessionLocal()
     try:
