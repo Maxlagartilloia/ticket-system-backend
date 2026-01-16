@@ -7,6 +7,7 @@ from app import models, schemas
 from app.dependencies import require_supervisor
 
 router = APIRouter(
+    prefix="/equipment",
     tags=["Equipment"]
 )
 
@@ -20,13 +21,13 @@ router = APIRouter(
     dependencies=[Depends(require_supervisor)]
 )
 def create_equipment(
-    equipment: schemas.EquipmentCreate,
+    payload: schemas.EquipmentCreate,
     db: Session = Depends(get_db)
 ):
-    # Verificar que el departamento exista
+    # 1. Verificar que el departamento exista
     department = (
         db.query(models.Department)
-        .filter(models.Department.id == equipment.department_id)
+        .filter(models.Department.id == payload.department_id)
         .first()
     )
 
@@ -36,7 +37,7 @@ def create_equipment(
             detail="Department not found"
         )
 
-    # Verificar que la institución del departamento esté activa
+    # 2. Verificar que la institución del departamento esté activa (ADN Safety)
     institution = (
         db.query(models.Institution)
         .filter(
@@ -49,14 +50,15 @@ def create_equipment(
     if not institution:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Institution is inactive"
+            detail="Institution is inactive or not found"
         )
 
+    # 3. Crear instancia de Equipment
     new_equipment = models.Equipment(
-        name=equipment.name,
-        model=equipment.model,
-        serial_number=equipment.serial_number,
-        department_id=equipment.department_id
+        name=payload.name,
+        model=payload.model,
+        serial_number=payload.serial_number,
+        department_id=payload.department_id
     )
 
     db.add(new_equipment)
@@ -77,7 +79,7 @@ def list_equipment_by_department(
     department_id: int,
     db: Session = Depends(get_db)
 ):
-    # Verificar que el departamento exista
+    # Verificar existencia del departamento
     department = (
         db.query(models.Department)
         .filter(models.Department.id == department_id)
@@ -90,7 +92,7 @@ def list_equipment_by_department(
             detail="Department not found"
         )
 
-    # Verificar que la institución esté activa
+    # Verificar que la sede esté operativa
     institution = (
         db.query(models.Institution)
         .filter(
@@ -103,7 +105,7 @@ def list_equipment_by_department(
     if not institution:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Institution not found or inactive"
+            detail="Institution found but it is inactive"
         )
 
     return (
