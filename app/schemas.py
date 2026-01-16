@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
 
-
 # =========================
 # AUTH
 # =========================
@@ -10,12 +9,10 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
-
 
 # =========================
 # USERS
@@ -25,20 +22,16 @@ class UserBase(BaseModel):
     email: EmailStr
     role: str
     institution_id: Optional[int] = None
-    # institution_id es obligatorio SOLO para clientes (validado en router)
-
 
 class UserCreate(UserBase):
     password: str
-
 
 class UserOut(UserBase):
     id: int
     is_active: bool
 
     class Config:
-        from_attributes = True
-
+        orm_mode = True
 
 # =========================
 # INSTITUTIONS
@@ -47,17 +40,14 @@ class InstitutionBase(BaseModel):
     name: str
     address: Optional[str] = None
 
-
 class InstitutionCreate(InstitutionBase):
     pass
-
 
 class InstitutionOut(InstitutionBase):
     id: int
 
     class Config:
-        from_attributes = True
-
+        orm_mode = True
 
 # =========================
 # DEPARTMENTS
@@ -66,17 +56,14 @@ class DepartmentBase(BaseModel):
     name: str
     institution_id: int
 
-
 class DepartmentCreate(DepartmentBase):
     pass
-
 
 class DepartmentOut(DepartmentBase):
     id: int
 
     class Config:
-        from_attributes = True
-
+        orm_mode = True
 
 # =========================
 # EQUIPMENT
@@ -87,17 +74,14 @@ class EquipmentBase(BaseModel):
     serial_number: Optional[str] = None
     department_id: int
 
-
 class EquipmentCreate(EquipmentBase):
     pass
-
 
 class EquipmentOut(EquipmentBase):
     id: int
 
     class Config:
-        from_attributes = True
-
+        orm_mode = True
 
 # =========================
 # TICKETS
@@ -109,17 +93,13 @@ class TicketBase(BaseModel):
     institution_id: int
     equipment_id: Optional[int] = None
 
-
 class TicketCreate(TicketBase):
     pass
-
 
 class TicketUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     assigned_to: Optional[int] = None
-    # Este schema se deja preparado para el siguiente ajuste de router
-
 
 class TicketOut(TicketBase):
     id: int
@@ -130,8 +110,7 @@ class TicketOut(TicketBase):
     assigned_to: Optional[int] = None
 
     class Config:
-        from_attributes = True
-
+        orm_mode = True
 
 # =========================
 # DASHBOARD
