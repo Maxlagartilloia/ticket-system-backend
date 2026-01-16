@@ -4,9 +4,12 @@ from typing import List
 
 from app.database import get_db
 from app import models, schemas
+from app.dependencies import require_supervisor
 
-router = APIRouter()
-
+router = APIRouter(
+    prefix="/institutions",
+    tags=["Institutions"]
+)
 
 # =========================
 # CREATE INSTITUTION
@@ -18,7 +21,8 @@ router = APIRouter()
 )
 def create_institution(
     institution: schemas.InstitutionCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_supervisor)
 ):
     existing = (
         db.query(models.Institution)
@@ -28,11 +32,15 @@ def create_institution(
 
     if existing:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Institution already exists"
         )
 
-    new_institution = models.Institution(**institution.dict())
+    new_institution = models.Institution(
+        name=institution.name,
+        address=institution.address
+    )
+
     db.add(new_institution)
     db.commit()
     db.refresh(new_institution)
@@ -47,8 +55,15 @@ def create_institution(
     "/",
     response_model=List[schemas.InstitutionOut]
 )
-def list_institutions(db: Session = Depends(get_db)):
-    return db.query(models.Institution).order_by(models.Institution.name).all()
+def list_institutions(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_supervisor)
+):
+    return (
+        db.query(models.Institution)
+        .order_by(models.Institution.name.asc())
+        .all()
+    )
 
 
 # =========================
@@ -60,7 +75,8 @@ def list_institutions(db: Session = Depends(get_db)):
 )
 def get_institution(
     institution_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_supervisor)
 ):
     institution = (
         db.query(models.Institution)
@@ -70,7 +86,7 @@ def get_institution(
 
     if not institution:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Institution not found"
         )
 
@@ -87,7 +103,8 @@ def get_institution(
 def update_institution(
     institution_id: int,
     institution: schemas.InstitutionCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_supervisor)
 ):
     db_institution = (
         db.query(models.Institution)
@@ -97,12 +114,12 @@ def update_institution(
 
     if not db_institution:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Institution not found"
         )
 
-    for key, value in institution.dict().items():
-        setattr(db_institution, key, value)
+    db_institution.name = institution.name
+    db_institution.address = institution.address
 
     db.commit()
     db.refresh(db_institution)
@@ -119,7 +136,8 @@ def update_institution(
 )
 def delete_institution(
     institution_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_supervisor)
 ):
     institution = (
         db.query(models.Institution)
@@ -129,7 +147,7 @@ def delete_institution(
 
     if not institution:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Institution not found"
         )
 
