@@ -7,7 +7,8 @@ from app import models, schemas
 from app.dependencies import require_supervisor
 
 router = APIRouter(
-    tags=["Institutions"]
+    prefix="/instituciones",
+    tags=["Instituciones"]
 )
 
 # =========================
@@ -16,13 +17,14 @@ router = APIRouter(
 @router.post(
     "/",
     response_model=schemas.InstitutionOut,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_supervisor)]
 )
 def create_institution(
     institution: schemas.InstitutionCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_supervisor)
+    db: Session = Depends(get_db)
 ):
+    # Verificar si ya existe una institución activa con el mismo nombre
     existing = (
         db.query(models.Institution)
         .filter(
@@ -56,11 +58,11 @@ def create_institution(
 # =========================
 @router.get(
     "/",
-    response_model=List[schemas.InstitutionOut]
+    response_model=List[schemas.InstitutionOut],
+    dependencies=[Depends(require_supervisor)]
 )
 def list_institutions(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_supervisor)
+    db: Session = Depends(get_db)
 ):
     return (
         db.query(models.Institution)
@@ -75,12 +77,12 @@ def list_institutions(
 # =========================
 @router.get(
     "/{institution_id}",
-    response_model=schemas.InstitutionOut
+    response_model=schemas.InstitutionOut,
+    dependencies=[Depends(require_supervisor)]
 )
 def get_institution(
     institution_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_supervisor)
+    db: Session = Depends(get_db)
 ):
     institution = (
         db.query(models.Institution)
@@ -94,7 +96,7 @@ def get_institution(
     if not institution:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Institution not found"
+            detail="Institution not found or inactive"
         )
 
     return institution
@@ -105,13 +107,13 @@ def get_institution(
 # =========================
 @router.put(
     "/{institution_id}",
-    response_model=schemas.InstitutionOut
+    response_model=schemas.InstitutionOut,
+    dependencies=[Depends(require_supervisor)]
 )
 def update_institution(
     institution_id: int,
     institution: schemas.InstitutionCreate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_supervisor)
+    db: Session = Depends(get_db)
 ):
     db_institution = (
         db.query(models.Institution)
@@ -142,12 +144,12 @@ def update_institution(
 # =========================
 @router.delete(
     "/{institution_id}",
-    status_code=status.HTTP_204_NO_CONTENT
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_supervisor)]
 )
 def delete_institution(
     institution_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_supervisor)
+    db: Session = Depends(get_db)
 ):
     institution = (
         db.query(models.Institution)
@@ -164,5 +166,6 @@ def delete_institution(
             detail="Institution not found"
         )
 
+    # Aplicamos Soft Delete (desactivar en lugar de borrar físicamente)
     institution.is_active = False
     db.commit()
