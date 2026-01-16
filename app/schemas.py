@@ -3,7 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 
 # =========================
-# AUTH
+# AUTH SCHEMAS
 # =========================
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -15,12 +15,12 @@ class TokenResponse(BaseModel):
     role: str
 
 # =========================
-# USERS
+# USERS SCHEMAS
 # =========================
 class UserBase(BaseModel):
     full_name: str
     email: EmailStr
-    role: str
+    role: str  # 'admin' or 'technician'
     institution_id: Optional[int] = None
 
 class UserCreate(UserBase):
@@ -31,14 +31,15 @@ class UserOut(UserBase):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =========================
-# INSTITUTIONS
+# INSTITUTIONS SCHEMAS
 # =========================
 class InstitutionBase(BaseModel):
     name: str
     address: Optional[str] = None
+    phone: Optional[str] = None
 
 class InstitutionCreate(InstitutionBase):
     pass
@@ -47,10 +48,10 @@ class InstitutionOut(InstitutionBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =========================
-# DEPARTMENTS
+# DEPARTMENTS SCHEMAS
 # =========================
 class DepartmentBase(BaseModel):
     name: str
@@ -63,10 +64,10 @@ class DepartmentOut(DepartmentBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =========================
-# EQUIPMENT
+# EQUIPMENT SCHEMAS
 # =========================
 class EquipmentBase(BaseModel):
     name: str
@@ -81,10 +82,10 @@ class EquipmentOut(EquipmentBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =========================
-# TICKETS
+# TICKETS SCHEMAS
 # =========================
 class TicketBase(BaseModel):
     title: str
@@ -110,10 +111,10 @@ class TicketOut(TicketBase):
     assigned_to: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # =========================
-# DASHBOARD
+# DASHBOARD SCHEMAS
 # =========================
 class DashboardStats(BaseModel):
     open_tickets: int
