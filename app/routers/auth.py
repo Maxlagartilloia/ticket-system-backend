@@ -1,28 +1,128 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta
+from jose import jwt
+from passlib.context import CryptContext
 
 from app.database import get_db
-from app.models import Usuario
-from app.auth import verify_password, create_access_token
+from app import models, schemas
+from app.dependencies import SECRET_KEY, ALGORITHM
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter(
+    prefix="/auth",
+    tags=["Auth"]
+)
+
+# =========================
+# PASSWORD CONFIG
+# =========================
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 
-@router.post("/login")
+# =========================
+# UTILS
+# =========================
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def create_access_token(user_id: int, role: str) -> str:
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode = {
+        "sub": user_id,
+        "role": role,
+        "exp": expire
+    }
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# =========================
+# LOGIN
+# =========================
+@router.post(
+    "/login",
+    response_model=schemas.TokenResponse
+)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    credentials: schemas.LoginRequest,
     db: Session = Depends(get_db)
 ):
-    user = db.query(Usuario).filter(Usuario.email == form_data.username).first()
+    user = (
+        db.query(models.User)
+        .filter(models.User.email == credentials.email)
+        .first()
+    )
 
-    if not user or not verify_password(form_data.password, user.password):
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
 
-    token = create_access_token(user.id, user.rol)
+    if not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is inactive"
+        )
+
+    access_token = create_access_token(
+        user_id=user.id,
+        role=user.role
+    )
 
     return {
-        "access_token": token,
+        "access_token": access_token,
         "token_type": "bearer",
-        "rol": user.rol
+        "role": user.role
+    }
+
+
+# =========================
+# CREATE FIRST ADMIN (ONE-TIME)
+# =========================
+@router.post(
+    "/bootstrap-admin",
+    status_code=status.HTTP_201_CREATED
+)
+def bootstrap_admin(
+    email: str,
+    full_name: str,
+    password: str,
+    db: Session = Depends(get_db)
+):
+    existing = db.query(models.User).filter(models.User.role == "admin").first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin already exists"
+        )
+
+    admin = models.User(
+        email=email,
+        full_name=full_name,
+        hashed_password=get_password_hash(password),
+        role="admin",
+        is_active=True
+    )
+
+    db.add(admin)
+    db.commit()
+
+    return {
+        "message": "Admin user created successfully"
     }
