@@ -4,7 +4,6 @@ from sqlalchemy.sql import func
 
 from app.database import Base
 
-
 # =========================
 # USERS
 # =========================
@@ -18,8 +17,9 @@ class User(Base):
     role = Column(String(50), nullable=False)  # admin | supervisor | technician | client
     is_active = Column(Boolean, default=True)
 
-    tickets_created = relationship("Ticket", back_populates="created_by_user")
-    tickets_assigned = relationship("Ticket", back_populates="assigned_technician")
+    # Relaciones acopladas con Ticket
+    tickets_created = relationship("Ticket", back_populates="created_by_user", foreign_keys="[Ticket.created_by]")
+    tickets_assigned = relationship("Ticket", back_populates="assigned_technician", foreign_keys="[Ticket.assigned_to]")
 
 
 # =========================
@@ -92,5 +92,7 @@ class Ticket(Base):
 
     institution = relationship("Institution", back_populates="tickets")
     equipment = relationship("Equipment", back_populates="tickets")
+    
+    # Especificación explícita de foreign_keys para evitar ambigüedad en User
     created_by_user = relationship("User", foreign_keys=[created_by], back_populates="tickets_created")
     assigned_technician = relationship("User", foreign_keys=[assigned_to], back_populates="tickets_assigned")
