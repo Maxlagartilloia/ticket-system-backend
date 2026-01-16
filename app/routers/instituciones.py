@@ -7,7 +7,6 @@ from app import models, schemas
 from app.dependencies import require_supervisor
 
 router = APIRouter(
-    prefix="/institutions",
     tags=["Institutions"]
 )
 
@@ -26,7 +25,10 @@ def create_institution(
 ):
     existing = (
         db.query(models.Institution)
-        .filter(models.Institution.name == institution.name)
+        .filter(
+            models.Institution.name == institution.name,
+            models.Institution.is_active == True
+        )
         .first()
     )
 
@@ -38,7 +40,8 @@ def create_institution(
 
     new_institution = models.Institution(
         name=institution.name,
-        address=institution.address
+        address=institution.address,
+        is_active=True
     )
 
     db.add(new_institution)
@@ -49,7 +52,7 @@ def create_institution(
 
 
 # =========================
-# LIST INSTITUTIONS
+# LIST INSTITUTIONS (ONLY ACTIVE)
 # =========================
 @router.get(
     "/",
@@ -61,6 +64,7 @@ def list_institutions(
 ):
     return (
         db.query(models.Institution)
+        .filter(models.Institution.is_active == True)
         .order_by(models.Institution.name.asc())
         .all()
     )
@@ -80,7 +84,10 @@ def get_institution(
 ):
     institution = (
         db.query(models.Institution)
-        .filter(models.Institution.id == institution_id)
+        .filter(
+            models.Institution.id == institution_id,
+            models.Institution.is_active == True
+        )
         .first()
     )
 
@@ -108,7 +115,10 @@ def update_institution(
 ):
     db_institution = (
         db.query(models.Institution)
-        .filter(models.Institution.id == institution_id)
+        .filter(
+            models.Institution.id == institution_id,
+            models.Institution.is_active == True
+        )
         .first()
     )
 
@@ -128,7 +138,7 @@ def update_institution(
 
 
 # =========================
-# DELETE INSTITUTION
+# DELETE INSTITUTION (SOFT DELETE)
 # =========================
 @router.delete(
     "/{institution_id}",
@@ -141,7 +151,10 @@ def delete_institution(
 ):
     institution = (
         db.query(models.Institution)
-        .filter(models.Institution.id == institution_id)
+        .filter(
+            models.Institution.id == institution_id,
+            models.Institution.is_active == True
+        )
         .first()
     )
 
@@ -151,5 +164,5 @@ def delete_institution(
             detail="Institution not found"
         )
 
-    db.delete(institution)
+    institution.is_active = False
     db.commit()
