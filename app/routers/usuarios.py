@@ -1,72 +1,104 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.models import Usuario, Institucion
-from app.dependencies import require_roles
-from app.auth import hash_password
+from app import models, schemas
+from app.dependencies import require_admin, require_supervisor
 
-router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
-
+router = APIRouter(
+    prefix="/usuarios",
+    tags=["Usuarios"]
+)
 
 # =========================
-# CREAR USUARIO
+# CREATE USER
 # =========================
-@router.post("/", dependencies=[Depends(require_roles("admin", "supervisor"))])
-def crear_usuario(
-    nombre: str,
-    email: str,
-    password: str,
-    rol: str,
-    institucion_id: int = None,
+@router.post(
+    "/",
+    response_model=schemas.UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_supervisor)]
+)
+def create_user(
+    payload: schemas.UserCreate,
     db: Session = Depends(get_db)
 ):
-    if rol not in ["admin", "supervisor", "tecnico", "cliente"]:
-        raise HTTPException(status_code=400, detail="Rol no válido")
+    # Validar rol permitido
+    if payload.role not in ["admin", "supervisor", "technician", "client"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role"
+        )
 
-    if db.query(Usuario).filter(Usuario.email == email).first():
-        raise HTTPException(status_code=400, detail="Email ya registrado")
+    # Verificar email único
+    existing = (
+        db.query(models.User)
+        .filter(models.User.email == payload.email)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
 
-    if rol == "cliente":
-        if not institucion_id:
-            raise HTTPException(status_code=400, detail="Cliente requiere institucion_id")
-
-        institucion = db.query(Institucion).filter(Institucion.id == institucion_id).first()
-        if not institucion:
-            raise HTTPException(status_code=404, detail="Institución no existe")
-
-    usuario = Usuario(
-        nombre=nombre,
-        email=email,
-        password=hash_password(password),
-        rol=rol,
-        institucion_id=institucion_id
+    # Crear usuario
+    user = models.User(
+        full_name=payload.full_name,
+        email=payload.email,
+        hashed_password=payload.password,  # hash se aplica en auth/bootstrap o flujo controlado
+        role=payload.role,
+        is_active=True
     )
 
-    db.add(usuario)
+    db.add(user)
     db.commit()
-    db.refresh(usuario)
-    return usuario
+    db.refresh(user)
+
+    return user
 
 
 # =========================
-# LISTAR USUARIOS
+# LIST USERS
 # =========================
-@router.get("/", dependencies=[Depends(require_roles("admin", "supervisor"))])
-def listar_usuarios(db: Session = Depends(get_db)):
-    return db.query(Usuario).order_by(Usuario.id).all()
-
-
-# =========================
-# OBTENER USUARIO
-# =========================
-@router.get("/{usuario_id}", dependencies=[Depends(require_roles("admin", "supervisor"))])
-def obtener_usuario(
-    usuario_id: int,
+@router.get(
+    "/",
+    response_model=List[schemas.UserOut],
+    dependencies=[Depends(require_supervisor)]
+)
+def list_users(
     db: Session = Depends(get_db)
 ):
-    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return usuario
+    return (
+        db.query(models.User)
+        .order_by(models.User.id.asc())
+        .all()
+    )
+
+
+# =========================
+# GET USER BY ID
+# =========================
+@router.get(
+    "/{user_id}",
+    response_model=schemas.UserOut,
+    dependencies=[Depends(require_supervisor)]
+)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(models.User)
+        .filter(models.User.id == user_id)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    return user
