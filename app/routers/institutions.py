@@ -7,8 +7,8 @@ from app import models, schemas
 from app.dependencies import require_supervisor
 
 router = APIRouter(
-    prefix="/instituciones",
-    tags=["Instituciones"]
+    prefix="/institutions",
+    tags=["Institutions"]
 )
 
 # =========================
@@ -21,14 +21,14 @@ router = APIRouter(
     dependencies=[Depends(require_supervisor)]
 )
 def create_institution(
-    institution: schemas.InstitutionCreate,
+    payload: schemas.InstitutionCreate,
     db: Session = Depends(get_db)
 ):
-    # Verificar si ya existe una institución activa con el mismo nombre
+    # 1. Verificar si ya existe una institución activa con el mismo nombre
     existing = (
         db.query(models.Institution)
         .filter(
-            models.Institution.name == institution.name,
+            models.Institution.name == payload.name,
             models.Institution.is_active == True
         )
         .first()
@@ -40,9 +40,11 @@ def create_institution(
             detail="Institution already exists"
         )
 
+    # 2. Crear nueva institución (incluyendo el campo phone del ADN)
     new_institution = models.Institution(
-        name=institution.name,
-        address=institution.address,
+        name=payload.name,
+        address=payload.address,
+        phone=payload.phone,
         is_active=True
     )
 
@@ -112,7 +114,7 @@ def get_institution(
 )
 def update_institution(
     institution_id: int,
-    institution: schemas.InstitutionCreate,
+    payload: schemas.InstitutionCreate,
     db: Session = Depends(get_db)
 ):
     db_institution = (
@@ -130,8 +132,9 @@ def update_institution(
             detail="Institution not found"
         )
 
-    db_institution.name = institution.name
-    db_institution.address = institution.address
+    db_institution.name = payload.name
+    db_institution.address = payload.address
+    db_institution.phone = payload.phone
 
     db.commit()
     db.refresh(db_institution)
@@ -166,6 +169,6 @@ def delete_institution(
             detail="Institution not found"
         )
 
-    # Aplicamos Soft Delete (desactivar en lugar de borrar físicamente)
+    # Soft Delete: Desactivar en lugar de borrar físicamente
     institution.is_active = False
     db.commit()
