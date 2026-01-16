@@ -2,26 +2,48 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
 import os
-from typing import Callable
+from typing import Optional
 
 from app.database import get_db
 from app.models import User
 
 # =========================
-# CONFIG
+# CONFIG & SECURITY SETUP
 # =========================
-
-# Estas variables se configuran en el Dashboard de Render -> Settings -> Environment Variables
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 horas de jornada laboral
 
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set in environment variables")
 
-# El flujo OAuth2 busca el endpoint de login para Swagger UI
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+# =========================
+# PASSWORD UTILS
+# =========================
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+# =========================
+# TOKEN CREATION
+# =========================
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 # =========================
 # GET CURRENT USER
@@ -44,7 +66,6 @@ def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    # Buscamos al usuario por ID (convertido a int para la DB)
     user = db.query(User).filter(User.id == int(user_id)).first()
     
     if user is None:
@@ -58,9 +79,8 @@ def get_current_user(
 
     return user
 
-
 # =========================
-# ROLE GUARDS (Protección de Rutas)
+# ROLE GUARDS
 # =========================
 def require_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
@@ -70,16 +90,13 @@ def require_admin(current_user: User = Depends(get_current_user)):
         )
     return current_user
 
-
 def require_supervisor(current_user: User = Depends(get_current_user)):
-    # El supervisor y el admin tienen permisos elevados
     if current_user.role not in ["admin", "supervisor"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Supervisor privileges required"
         )
     return current_user
-
 
 def require_technician(current_user: User = Depends(get_current_user)):
     if current_user.role not in ["admin", "technician"]:
@@ -88,7 +105,6 @@ def require_technician(current_user: User = Depends(get_current_user)):
             detail="Technician privileges required"
         )
     return current_user
-
 
 def require_client(current_user: User = Depends(get_current_user)):
     if current_user.role != "client":
