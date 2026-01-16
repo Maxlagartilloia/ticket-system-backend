@@ -13,6 +13,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
+    full_name: str
 
 # =========================
 # USERS SCHEMAS
@@ -20,7 +21,7 @@ class TokenResponse(BaseModel):
 class UserBase(BaseModel):
     full_name: str
     email: EmailStr
-    role: str  # 'admin' or 'technician'
+    role: str  # 'admin', 'supervisor', 'technician', 'client'
     institution_id: Optional[int] = None
 
 class UserCreate(UserBase):
@@ -89,10 +90,9 @@ class EquipmentOut(EquipmentBase):
 # =========================
 class TicketBase(BaseModel):
     title: str
-    description: str
-    priority: str
+    description: Optional[str] = None
+    priority: str = "medium"
     institution_id: int
-    equipment_id: Optional[int] = None
 
 class TicketCreate(TicketBase):
     pass
@@ -100,15 +100,12 @@ class TicketCreate(TicketBase):
 class TicketUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
-    assigned_to: Optional[int] = None
 
 class TicketOut(TicketBase):
     id: int
     status: str
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    created_by: int
-    assigned_to: Optional[int] = None
+    creator_id: int
 
     class Config:
         from_attributes = True
@@ -117,7 +114,7 @@ class TicketOut(TicketBase):
 # DASHBOARD SCHEMAS
 # =========================
 class DashboardStats(BaseModel):
+    total_tickets: int
     open_tickets: int
-    in_progress: int
-    resolved_today: int
-    institutions: int
+    closed_tickets: int
+    total_institutions: int
