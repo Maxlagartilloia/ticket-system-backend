@@ -4,9 +4,8 @@ from datetime import datetime
 
 
 # =========================
-# AUTH / USERS
+# AUTH
 # =========================
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -18,10 +17,13 @@ class TokenResponse(BaseModel):
     role: str
 
 
+# =========================
+# USERS
+# =========================
 class UserBase(BaseModel):
-    name: str
+    full_name: str
     email: EmailStr
-    role: str  # admin | supervisor | technician | client
+    role: str
 
 
 class UserCreate(UserBase):
@@ -31,7 +33,6 @@ class UserCreate(UserBase):
 class UserOut(UserBase):
     id: int
     is_active: bool
-    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -40,7 +41,6 @@ class UserOut(UserBase):
 # =========================
 # INSTITUTIONS
 # =========================
-
 class InstitutionBase(BaseModel):
     name: str
     address: Optional[str] = None
@@ -52,7 +52,25 @@ class InstitutionCreate(InstitutionBase):
 
 class InstitutionOut(InstitutionBase):
     id: int
-    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# =========================
+# DEPARTMENTS
+# =========================
+class DepartmentBase(BaseModel):
+    name: str
+    institution_id: int
+
+
+class DepartmentCreate(DepartmentBase):
+    pass
+
+
+class DepartmentOut(DepartmentBase):
+    id: int
 
     class Config:
         from_attributes = True
@@ -61,12 +79,12 @@ class InstitutionOut(InstitutionBase):
 # =========================
 # TICKETS
 # =========================
-
 class TicketBase(BaseModel):
-    institution_id: int
-    equipment: str
+    title: str
     description: str
-    priority: str  # low | medium | high
+    priority: str
+    institution_id: int
+    equipment_id: Optional[int] = None
 
 
 class TicketCreate(TicketBase):
@@ -74,25 +92,23 @@ class TicketCreate(TicketBase):
 
 
 class TicketUpdate(BaseModel):
-    technician_id: Optional[int] = None
-    status: Optional[str] = None  # open | in_progress | closed
+    status: Optional[str] = None
     priority: Optional[str] = None
+    assigned_to: Optional[int] = None
 
 
 class TicketOut(TicketBase):
     id: int
     status: str
     created_at: datetime
-    technician_id: Optional[int] = None
 
     class Config:
         from_attributes = True
 
 
 # =========================
-# REPORTS (BASIC)
+# DASHBOARD
 # =========================
-
 class DashboardStats(BaseModel):
     open_tickets: int
     in_progress: int
