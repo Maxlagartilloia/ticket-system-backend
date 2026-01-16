@@ -1,22 +1,20 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 
-# Importación absoluta para evitar errores de ruta en Render
-from app.routers import auth, usuarios, tickets, departments, equipment, instituciones, reportes
+# Importaciones absolutas para evitar el error 404 en entornos de nube
+from app.routers.auth import router as auth_router
+from app.routers.usuarios import router as usuarios_router
+from app.routers.tickets import router as tickets_router
+from app.routers.departments import router as departments_router
+from app.routers.equipment import router as equipment_router
+from app.routers.instituciones import router as instituciones_router
+from app.routers.reportes import router as reportes_router
 
-# Intentar crear tablas
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"Error creando tablas: {e}")
+# Intentar crear tablas en la base de datos
+Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="CopierMaster",
-    docs_url="/docs",  # Forzamos la URL de documentación
-    redoc_url=None
-)
+app = FastAPI(title="CopierMaster API", docs_url="/docs")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,19 +24,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registro de rutas
-app.include_router(auth.router)
-app.include_router(usuarios.router)
-app.include_router(tickets.router)
-app.include_router(departments.router)
-app.include_router(equipment.router)
-app.include_router(instituciones.router)
-app.include_router(reportes.router)
-
-@app.get("/test-v2")
-def test():
-    return {"status": "success", "info": "Si ves esto, el ruteo ya funciona"}
+# Registro de routers con sus objetos específicos
+app.include_router(auth_router)
+app.include_router(usuarios_router)
+app.include_router(tickets_router)
+app.include_router(departments_router)
+app.include_router(equipment_router)
+app.include_router(instituciones_router)
+app.include_router(reportes_router)
 
 @app.get("/")
-def read_root():
-    return {"message": "Bienvenido a CopierMaster API"}
+def health_check():
+    return {"status": "online", "message": "CopierMaster Backend Ready"}
