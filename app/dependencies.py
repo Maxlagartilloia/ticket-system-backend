@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 import os
+from typing import Callable
 
 from app.database import get_db
 from app.models import User
@@ -18,7 +19,8 @@ ALGORITHM = "HS256"
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set in environment variables")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+# El login real es /auth/login
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 # =========================
@@ -36,7 +38,7 @@ def get_current_user(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int | None = payload.get("sub")
+        user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
     except JWTError:
@@ -45,6 +47,12 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is inactive"
+        )
 
     return user
 
@@ -77,3 +85,26 @@ def require_technician(current_user: User = Depends(get_current_user)):
             detail="Technician privileges required"
         )
     return current_user
+
+
+def require_client(current_user: User = Depends(get_current_user)):
+    if current_user.role != "client":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Client privileges required"
+        )
+    return current_user
+
+
+# =========================
+# GENERIC ROLE HELPER
+# =========================
+def require_any_role(*roles: str) -> Callable:
+    def _require(current_user: User = Depends(get_current_user)):
+        if current_user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient privileges"
+            )
+        return current_user
+    return _require
