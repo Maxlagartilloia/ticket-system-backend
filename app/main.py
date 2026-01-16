@@ -4,18 +4,18 @@ from app.database import engine, Base
 from app import models
 from app.routers import auth, users, tickets, institutions, departments, equipment, reports
 
-# Crea las tablas automáticamente
+# Crea las tablas automáticamente en Render
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CopierMaster API")
 
-# 🛡️ CONFIGURACIÓN CORS BLINDADA
-# Esto permite que tanto el dominio principal como el de soporte funcionen
+# 🛡️ LISTA DE INVITADOS AUTORIZADOS (CORS)
+# Agregamos todos tus posibles subdominios aquí
 origins = [
     "https://copiermastercyg.com.ec",
     "https://www.copiermastercyg.com.ec",
-    "https://soporte.copiermastercyg.com.ec",
-    "http://localhost:3000", # Para tus pruebas locales
+    "https://soporte.copiermastercyg.com.ec",  # Este es el que te está bloqueando ahora
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -37,4 +37,4 @@ app.include_router(reports.router)
 
 @app.get("/")
 def root():
-    return {"message": "CopierMaster Backend is Live and Secure"}
+    return {"message": "CopierMaster Backend is Live and Authorizing Soporte Subdomain"}
