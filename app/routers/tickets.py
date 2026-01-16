@@ -4,7 +4,11 @@ from typing import List
 
 from app.database import get_db
 from app import models, schemas
-from app.dependencies import get_current_user
+from app.dependencies import (
+    get_current_user,
+    require_supervisor,
+    require_technician
+)
 
 router = APIRouter(
     prefix="/tickets",
@@ -20,30 +24,30 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED
 )
 def create_ticket(
-    ticket: schemas.TicketCreate,
+    payload: schemas.TicketCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    new_ticket = models.Ticket(
+    ticket = models.Ticket(
         title="Support Ticket",
-        description=ticket.description,
-        priority=ticket.priority,
+        description=payload.description,
+        priority=payload.priority,
         status="open",
-        institution_id=ticket.institution_id,
+        institution_id=payload.institution_id,
         equipment_id=None,
         created_by=current_user.id,
         assigned_to=None
     )
 
-    db.add(new_ticket)
+    db.add(ticket)
     db.commit()
-    db.refresh(new_ticket)
+    db.refresh(ticket)
 
-    return new_ticket
+    return ticket
 
 
 # =========================
-# LIST ALL TICKETS
+# LIST TICKETS (ROLE-BASED)
 # =========================
 @router.get(
     "/",
@@ -53,11 +57,13 @@ def list_tickets(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Admin & Supervisor see all tickets
     if current_user.role in ["admin", "supervisor"]:
-        return db.query(models.Ticket).order_by(models.Ticket.created_at.desc()).all()
+        return (
+            db.query(models.Ticket)
+            .order_by(models.Ticket.created_at.desc())
+            .all()
+        )
 
-    # Technicians see only assigned tickets
     if current_user.role == "technician":
         return (
             db.query(models.Ticket)
@@ -66,7 +72,6 @@ def list_tickets(
             .all()
         )
 
-    # Clients see only their own tickets
     return (
         db.query(models.Ticket)
         .filter(models.Ticket.created_by == current_user.id)
@@ -76,17 +81,17 @@ def list_tickets(
 
 
 # =========================
-# UPDATE TICKET
+# ASSIGN TECHNICIAN
 # =========================
 @router.put(
-    "/{ticket_id}",
+    "/{ticket_id}/assign",
     response_model=schemas.TicketOut
 )
-def update_ticket(
+def assign_technician(
     ticket_id: int,
-    data: schemas.TicketUpdate,
+    technician_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_supervisor)
 ):
     ticket = (
         db.query(models.Ticket)
@@ -100,22 +105,76 @@ def update_ticket(
             detail="Ticket not found"
         )
 
-    # Only admin or supervisor can reassign or close tickets
-    if current_user.role not in ["admin", "supervisor"]:
+    technician = (
+        db.query(models.User)
+        .filter(
+            models.User.id == technician_id,
+            models.User.role == "technician"
+        )
+        .first()
+    )
+
+    if not technician:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid technician"
         )
 
-    if data.status is not None:
-        ticket.status = data.status
+    ticket.assigned_to = technician.id
+    ticket.status = "in_progress"
 
-    if data.priority is not None:
-        ticket.priority = data.priority
+    db.commit()
+    db.refresh(ticket)
 
-    if data.technician_id is not None:
-        ticket.assigned_to = data.technician_id
+    return ticket
 
+
+# =========================
+# UPDATE TICKET STATUS
+# =========================
+@router.put(
+    "/{ticket_id}/status",
+    response_model=schemas.TicketOut
+)
+def update_ticket_status(
+    ticket_id: int,
+    status_value: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if status_value not in ["open", "in_progress", "closed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid status"
+        )
+
+    ticket = (
+        db.query(models.Ticket)
+        .filter(models.Ticket.id == ticket_id)
+        .first()
+    )
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+
+    # Only supervisor or assigned technician can change status
+    if current_user.role == "technician":
+        if ticket.assigned_to != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized"
+            )
+
+    if current_user.role not in ["admin", "supervisor", "technician"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized"
+        )
+
+    ticket.status = status_value
     db.commit()
     db.refresh(ticket)
 
