@@ -4,7 +4,6 @@ from typing import List
 
 from app.database import get_db
 from app import models, schemas
-from app.dependencies import require_supervisor
 
 router = APIRouter(
     prefix="/equipment",
@@ -17,8 +16,7 @@ router = APIRouter(
 @router.post(
     "/",
     response_model=schemas.EquipmentOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_supervisor)]
+    status_code=status.HTTP_201_CREATED
 )
 def create_equipment(
     payload: schemas.EquipmentCreate,
@@ -37,20 +35,17 @@ def create_equipment(
             detail="Department not found"
         )
 
-    # 2. Verificar que la institución del departamento esté activa (ADN Safety)
+    # 2. Verificar que la institución del departamento exista (ADN Safety)
     institution = (
         db.query(models.Institution)
-        .filter(
-            models.Institution.id == department.institution_id,
-            models.Institution.is_active == True
-        )
+        .filter(models.Institution.id == department.institution_id)
         .first()
     )
 
     if not institution:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Institution is inactive or not found"
+            detail="Institution not found for this department"
         )
 
     # 3. Crear instancia de Equipment
@@ -61,11 +56,17 @@ def create_equipment(
         department_id=payload.department_id
     )
 
-    db.add(new_equipment)
-    db.commit()
-    db.refresh(new_equipment)
-
-    return new_equipment
+    try:
+        db.add(new_equipment)
+        db.commit()
+        db.refresh(new_equipment)
+        return new_equipment
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
 
 
 # =========================
@@ -90,22 +91,6 @@ def list_equipment_by_department(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Department not found"
-        )
-
-    # Verificar que la sede esté operativa
-    institution = (
-        db.query(models.Institution)
-        .filter(
-            models.Institution.id == department.institution_id,
-            models.Institution.is_active == True
-        )
-        .first()
-    )
-
-    if not institution:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Institution found but it is inactive"
         )
 
     return (
