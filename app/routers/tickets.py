@@ -7,7 +7,8 @@ from app import models, schemas
 from app.dependencies import (
     get_current_user,
     require_supervisor,
-    require_technician
+    require_technician,
+    require_client
 )
 
 router = APIRouter(
@@ -16,25 +17,73 @@ router = APIRouter(
 )
 
 # =========================
-# CREATE TICKET
+# CREATE TICKET (CLIENT ONLY)
 # =========================
 @router.post(
     "/",
     response_model=schemas.TicketOut,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_client)]
 )
 def create_ticket(
     payload: schemas.TicketCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # Validar institución existente y activa
+    institution = (
+        db.query(models.Institution)
+        .filter(
+            models.Institution.id == payload.institution_id,
+            models.Institution.is_active == True
+        )
+        .first()
+    )
+
+    if not institution:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Institution not found or inactive"
+        )
+
+    equipment_id = None
+
+    # Validar equipment si se envía
+    if payload.equipment_id:
+        equipment = (
+            db.query(models.Equipment)
+            .filter(models.Equipment.id == payload.equipment_id)
+            .first()
+        )
+
+        if not equipment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Equipment not found"
+            )
+
+        # Validar que el equipment pertenezca a la institución
+        department = (
+            db.query(models.Department)
+            .filter(models.Department.id == equipment.department_id)
+            .first()
+        )
+
+        if not department or department.institution_id != institution.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Equipment does not belong to institution"
+            )
+
+        equipment_id = equipment.id
+
     ticket = models.Ticket(
-        title="Support Ticket",
+        title=payload.title,
         description=payload.description,
         priority=payload.priority,
         status="open",
         institution_id=payload.institution_id,
-        equipment_id=None,
+        equipment_id=equipment_id,
         created_by=current_user.id,
         assigned_to=None
     )
@@ -72,6 +121,7 @@ def list_tickets(
             .all()
         )
 
+    # client
     return (
         db.query(models.Ticket)
         .filter(models.Ticket.created_by == current_user.id)
@@ -81,17 +131,17 @@ def list_tickets(
 
 
 # =========================
-# ASSIGN TECHNICIAN
+# ASSIGN TECHNICIAN (SUPERVISOR ONLY)
 # =========================
 @router.put(
     "/{ticket_id}/assign",
-    response_model=schemas.TicketOut
+    response_model=schemas.TicketOut,
+    dependencies=[Depends(require_supervisor)]
 )
 def assign_technician(
     ticket_id: int,
     technician_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_supervisor)
+    db: Session = Depends(get_db)
 ):
     ticket = (
         db.query(models.Ticket)
@@ -105,11 +155,18 @@ def assign_technician(
             detail="Ticket not found"
         )
 
+    if ticket.status != "open":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only open tickets can be assigned"
+        )
+
     technician = (
         db.query(models.User)
         .filter(
             models.User.id == technician_id,
-            models.User.role == "technician"
+            models.User.role == "technician",
+            models.User.is_active == True
         )
         .first()
     )
@@ -160,7 +217,7 @@ def update_ticket_status(
             detail="Ticket not found"
         )
 
-    # Only supervisor or assigned technician can change status
+    # Technician solo puede cambiar estado si es el asignado
     if current_user.role == "technician":
         if ticket.assigned_to != current_user.id:
             raise HTTPException(
