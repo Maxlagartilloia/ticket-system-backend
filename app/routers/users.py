@@ -4,11 +4,11 @@ from typing import List
 
 from app.database import get_db
 from app import models, schemas
-from app.dependencies import require_admin, require_supervisor
+from app.dependencies import require_admin, require_supervisor, get_password_hash
 
 router = APIRouter(
-    prefix="/usuarios",
-    tags=["Usuarios"]
+    prefix="/users",
+    tags=["Users"]
 )
 
 # =========================
@@ -24,31 +24,29 @@ def create_user(
     payload: schemas.UserCreate,
     db: Session = Depends(get_db)
 ):
-    # Validar rol permitido
-    if payload.role not in ["admin", "supervisor", "technician", "client"]:
+    # 1. Validar rol permitido (Blueprint ADN)
+    allowed_roles = ["admin", "supervisor", "technician", "client"]
+    if payload.role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid role"
+            detail=f"Invalid role. Allowed: {allowed_roles}"
         )
 
-    # Verificar email único
-    existing = (
-        db.query(models.User)
-        .filter(models.User.email == payload.email)
-        .first()
-    )
+    # 2. Verificar email único
+    existing = db.query(models.User).filter(models.User.email == payload.email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
 
-    # Crear usuario
+    # 3. Crear usuario con HASH de contraseña (Seguridad Crítica)
     user = models.User(
         full_name=payload.full_name,
         email=payload.email,
-        hashed_password=payload.password,  # hash se aplica en auth/bootstrap o flujo controlado
+        hashed_password=get_password_hash(payload.password),
         role=payload.role,
+        institution_id=payload.institution_id,
         is_active=True
     )
 
@@ -57,7 +55,6 @@ def create_user(
     db.refresh(user)
 
     return user
-
 
 # =========================
 # LIST USERS
@@ -76,7 +73,6 @@ def list_users(
         .all()
     )
 
-
 # =========================
 # GET USER BY ID
 # =========================
@@ -89,11 +85,7 @@ def get_user(
     user_id: int,
     db: Session = Depends(get_db)
 ):
-    user = (
-        db.query(models.User)
-        .filter(models.User.id == user_id)
-        .first()
-    )
+    user = db.query(models.User).filter(models.User.id == user_id).first()
 
     if not user:
         raise HTTPException(
