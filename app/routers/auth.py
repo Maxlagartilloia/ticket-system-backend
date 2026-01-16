@@ -61,13 +61,7 @@ def login(
         .first()
     )
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-
-    if not verify_password(credentials.password, user.hashed_password):
+    if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
@@ -92,7 +86,7 @@ def login(
 
 
 # =========================
-# CREATE FIRST ADMIN (ONE-TIME)
+# CREATE FIRST ADMIN (ONE-TIME, SAFE)
 # =========================
 @router.post(
     "/bootstrap-admin",
@@ -104,12 +98,17 @@ def bootstrap_admin(
     password: str,
     db: Session = Depends(get_db)
 ):
-    existing = db.query(models.User).filter(models.User.role == "admin").first()
+    # Si ya existe al menos un admin, el endpoint queda bloqueado
+    existing_admin = (
+        db.query(models.User)
+        .filter(models.User.role == "admin")
+        .first()
+    )
 
-    if existing:
+    if existing_admin:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Admin already exists"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bootstrap admin is disabled"
         )
 
     admin = models.User(
