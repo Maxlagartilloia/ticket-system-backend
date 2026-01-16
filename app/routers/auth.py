@@ -1,65 +1,48 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-from jose import jwt
-from passlib.context import CryptContext
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app import models, schemas
-from app.dependencies import SECRET_KEY, ALGORITHM
+from app.dependencies import verify_password, create_access_token
 
 router = APIRouter(
     prefix="/auth",
-    tags=["Auth"]
+    tags=["Authentication"]
 )
-
-# Configuración de Hash para contraseñas (BCRYPT)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 horas
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
-
-def create_access_token(user_id: int, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {
-        "sub": str(user_id),
-        "role": role,
-        "exp": expire
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 @router.post("/login", response_model=schemas.TokenResponse)
 def login(
     credentials: schemas.LoginRequest,
     db: Session = Depends(get_db)
 ):
-    # Buscar usuario por email
+    # 1. Buscar usuario por email (ADN del sistema)
     user = db.query(models.User).filter(
         models.User.email == credentials.email
     ).first()
 
-    # Validar existencia y contraseña
+    # 2. Validar existencia y contraseña usando la utilidad de dependencies
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # 3. Validar estado de la cuenta
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User inactive"
+            detail="User account is inactive"
         )
 
-    # Generar Token JWT
-    token = create_access_token(user.id, user.role)
+    # 4. Generar Token JWT con el 'sub' y el 'role' (Standard Blueprint)
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role}
+    )
 
     return {
-        "access_token": token,
+        "access_token": access_token,
         "token_type": "bearer",
         "role": user.role
     }
