@@ -1,28 +1,23 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 
-# Importaciones forzadas para asegurar el acoplamiento
-from app.routers import (
-    auth,
-    usuarios,
-    tickets,
-    departments,
-    equipment,
-    instituciones,
-    reportes
-)
+# Importación absoluta para evitar errores de ruta en Render
+from app.routers import auth, usuarios, tickets, departments, equipment, instituciones, reportes
 
-# Crear tablas en la DB
-Base.metadata.create_all(bind=engine)
+# Intentar crear tablas
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Error creando tablas: {e}")
 
 app = FastAPI(
-    title="CopierMaster Ticket System",
-    description="Sistema de gestión de tickets - API Backend",
-    version="1.0.0"
+    title="CopierMaster",
+    docs_url="/docs",  # Forzamos la URL de documentación
+    redoc_url=None
 )
 
-# Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registro explícito de rutas
+# Registro de rutas
 app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(tickets.router)
@@ -40,11 +35,10 @@ app.include_router(equipment.router)
 app.include_router(instituciones.router)
 app.include_router(reportes.router)
 
-@app.get("/", tags=["Root"])
-def root():
-    return {"status": "online", "message": "CopierMaster API Ready"}
+@app.get("/test-v2")
+def test():
+    return {"status": "success", "info": "Si ves esto, el ruteo ya funciona"}
 
-# Ruta de diagnóstico para ingenieros
-@app.get("/debug-urls", tags=["Debug"])
-def debug_urls():
-    return {"urls": [route.path for route in app.routes]}
+@app.get("/")
+def read_root():
+    return {"message": "Bienvenido a CopierMaster API"}
