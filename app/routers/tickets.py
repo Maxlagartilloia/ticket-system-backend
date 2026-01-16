@@ -30,7 +30,7 @@ def create_ticket(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Validar institución existente y activa
+    # 1. Validar institución existente y activa
     institution = (
         db.query(models.Institution)
         .filter(
@@ -46,9 +46,8 @@ def create_ticket(
             detail="Institution not found or inactive"
         )
 
-    equipment_id = None
-
-    # Validar equipment si se envía
+    # 2. Validar equipment si se proporciona
+    final_equipment_id = None
     if payload.equipment_id:
         equipment = (
             db.query(models.Equipment)
@@ -62,7 +61,7 @@ def create_ticket(
                 detail="Equipment not found"
             )
 
-        # Validar que el equipment pertenezca a la institución
+        # 3. Validar pertenencia del equipo a la institución (vía departamento)
         department = (
             db.query(models.Department)
             .filter(models.Department.id == equipment.department_id)
@@ -72,31 +71,32 @@ def create_ticket(
         if not department or department.institution_id != institution.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Equipment does not belong to institution"
+                detail="Equipment does not belong to this institution"
             )
+        
+        final_equipment_id = equipment.id
 
-        equipment_id = equipment.id
-
-    ticket = models.Ticket(
+    # 4. Crear instancia del modelo
+    new_ticket = models.Ticket(
         title=payload.title,
         description=payload.description,
         priority=payload.priority,
         status="open",
         institution_id=payload.institution_id,
-        equipment_id=equipment_id,
+        equipment_id=final_equipment_id,
         created_by=current_user.id,
         assigned_to=None
     )
 
-    db.add(ticket)
+    db.add(new_ticket)
     db.commit()
-    db.refresh(ticket)
+    db.refresh(new_ticket)
 
-    return ticket
+    return new_ticket
 
 
 # =========================
-# LIST TICKETS (ROLE-BASED)
+# LIST TICKETS (ROLE-BASED VIEW)
 # =========================
 @router.get(
     "/",
@@ -106,28 +106,21 @@ def list_tickets(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    query = db.query(models.Ticket)
+
+    # Filtros según el rol del usuario
     if current_user.role in ["admin", "supervisor"]:
-        return (
-            db.query(models.Ticket)
-            .order_by(models.Ticket.created_at.desc())
-            .all()
-        )
+        # Ven todo el histórico
+        return query.order_by(models.Ticket.created_at.desc()).all()
 
     if current_user.role == "technician":
-        return (
-            db.query(models.Ticket)
-            .filter(models.Ticket.assigned_to == current_user.id)
-            .order_by(models.Ticket.created_at.desc())
-            .all()
-        )
+        # Solo ven tickets asignados a ellos
+        return query.filter(models.Ticket.assigned_to == current_user.id)\
+                    .order_by(models.Ticket.created_at.desc()).all()
 
-    # client
-    return (
-        db.query(models.Ticket)
-        .filter(models.Ticket.created_by == current_user.id)
-        .order_by(models.Ticket.created_at.desc())
-        .all()
-    )
+    # Clientes solo ven los tickets que ellos mismos crearon
+    return query.filter(models.Ticket.created_by == current_user.id)\
+                .order_by(models.Ticket.created_at.desc()).all()
 
 
 # =========================
@@ -143,51 +136,34 @@ def assign_technician(
     technician_id: int,
     db: Session = Depends(get_db)
 ):
-    ticket = (
-        db.query(models.Ticket)
-        .filter(models.Ticket.id == ticket_id)
-        .first()
-    )
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
 
     if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ticket not found"
-        )
+        raise HTTPException(status_code=404, detail="Ticket not found")
 
-    if ticket.status != "open":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only open tickets can be assigned"
-        )
+    if ticket.status == "closed":
+        raise HTTPException(status_code=400, detail="Cannot assign a closed ticket")
 
-    technician = (
-        db.query(models.User)
-        .filter(
-            models.User.id == technician_id,
-            models.User.role == "technician",
-            models.User.is_active == True
-        )
-        .first()
-    )
+    # Validar que el técnico existe y es apto
+    technician = db.query(models.User).filter(
+        models.User.id == technician_id,
+        models.User.role == "technician",
+        models.User.is_active == True
+    ).first()
 
     if not technician:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid technician"
-        )
+        raise HTTPException(status_code=400, detail="Invalid or inactive technician")
 
     ticket.assigned_to = technician.id
     ticket.status = "in_progress"
 
     db.commit()
     db.refresh(ticket)
-
     return ticket
 
 
 # =========================
-# UPDATE TICKET STATUS
+# UPDATE STATUS (STAFF ONLY)
 # =========================
 @router.put(
     "/{ticket_id}/status",
@@ -200,39 +176,22 @@ def update_ticket_status(
     current_user: models.User = Depends(get_current_user)
 ):
     if status_value not in ["open", "in_progress", "closed"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid status"
-        )
+        raise HTTPException(status_code=400, detail="Invalid status value")
 
-    ticket = (
-        db.query(models.Ticket)
-        .filter(models.Ticket.id == ticket_id)
-        .first()
-    )
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
 
     if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ticket not found"
-        )
+        raise HTTPException(status_code=404, detail="Ticket not found")
 
-    # Technician solo puede cambiar estado si es el asignado
-    if current_user.role == "technician":
-        if ticket.assigned_to != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized"
-            )
+    # Restricción: El técnico solo puede actualizar sus propios tickets asignados
+    if current_user.role == "technician" and ticket.assigned_to != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this ticket")
 
-    if current_user.role not in ["admin", "supervisor", "technician"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized"
-        )
+    # Restricción: Clientes no pueden cambiar el estado del ticket
+    if current_user.role == "client":
+        raise HTTPException(status_code=403, detail="Clients cannot modify ticket status")
 
     ticket.status = status_value
     db.commit()
     db.refresh(ticket)
-
     return ticket
