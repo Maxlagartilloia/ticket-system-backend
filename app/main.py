@@ -39,13 +39,16 @@ app.add_middleware(
 # =========================
 # ROUTERS
 # =========================
-app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(usuarios.router, prefix="/usuarios", tags=["Usuarios"])
-app.include_router(instituciones.router, prefix="/instituciones", tags=["Institutions"])
-app.include_router(departments.router, prefix="/departments", tags=["Departments"])
-app.include_router(equipment.router, prefix="/equipment", tags=["Equipment"])
-app.include_router(tickets.router, prefix="/tickets", tags=["Tickets"])
-app.include_router(reportes.router, prefix="/reportes", tags=["Reports"])
+# auth, usuarios y tickets YA tienen prefijo en su router
+app.include_router(auth.router)
+app.include_router(usuarios.router)
+app.include_router(tickets.router)
+
+# estos routers NO tienen prefijo interno
+app.include_router(instituciones.router, prefix="/instituciones")
+app.include_router(departments.router, prefix="/departments")
+app.include_router(equipment.router, prefix="/equipment")
+app.include_router(reportes.router, prefix="/reportes")
 
 # =========================
 # HEALTHCHECK
