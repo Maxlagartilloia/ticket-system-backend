@@ -13,7 +13,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-# 🚨 CAMBIO AQUÍ: Se llama UserOut para que coincida con lo que pide el router
+# 🚨 Se llama UserOut porque así lo pide el router de usuarios
 class UserOut(UserBase):
     id: int
     class Config:
@@ -45,7 +45,8 @@ class TicketBase(BaseModel):
 class TicketCreate(TicketBase):
     pass
 
-class Ticket(TicketBase):
+# 🚨 Se llama TicketOut porque así lo pide el router de tickets
+class TicketOut(TicketBase):
     id: int
     created_at: datetime
     creator_id: int
