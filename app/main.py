@@ -5,19 +5,16 @@ from app.database import Base, engine
 from app.routers import (
     auth,
     usuarios,
-    instituciones,
-    departments,
-    equipment,
     tickets,
-    reportes
+    departamentos,
+    equipment,
+    instituciones,
+    reportes,
 )
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="CopierMaster Ticket System",
-    version="1.0.0"
-)
+app = FastAPI(title="CopierMaster Ticket System")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,19 +24,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ROUTERS
 app.include_router(auth.router)
-app.include_router(usuarios.router, prefix="/usuarios")
-app.include_router(instituciones.router, prefix="/instituciones")
-app.include_router(departments.router, prefix="/departments")
-app.include_router(equipment.router, prefix="/equipment")
-app.include_router(tickets.router, prefix="/tickets")
-app.include_router(reportes.router, prefix="/reportes")
-
-@app.get("/")
-def root():
-    return {
-        "status": "ok",
-        "service": "CopierMaster Backend",
-        "version": "1.0.0"
-    }
+app.include_router(usuarios.router)
+app.include_router(tickets.router)
+app.include_router(departamentos.router)
+app.include_router(equipment.router)
+app.include_router(instituciones.router)
+app.include_router(reportes.router)
