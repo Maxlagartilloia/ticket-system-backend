@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 
-# Importaciones sincronizadas con tu GitHub
+# Importaciones sincronizadas con tu estructura física de archivos
 from app.routers import (
     auth,
     usuarios,
@@ -13,7 +13,7 @@ from app.routers import (
     reportes,
 )
 
-# Crear tablas
+# Generar tablas en la base de datos
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CopierMaster Ticket System")
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registro de routers - ASEGÚRATE DE QUE QUEDEN ASÍ
+# Registro de Routers
 app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(tickets.router)
@@ -37,8 +37,9 @@ app.include_router(reportes.router)
 
 @app.get("/")
 def root():
-    return {"message": "API de CopierMaster Online"}
+    return {"message": "CopierMaster API Online"}
 
-@app.get("/debug-routes")
-def debug():
-    return {"routes": [route.path for route in app.routes]}
+# Esta ruta te dirá qué URLs reconoce el servidor realmente
+@app.get("/check-routes")
+def check_routes():
+    return {"available_endpoints": [route.path for route in app.routes]}
