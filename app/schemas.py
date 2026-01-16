@@ -13,7 +13,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-# 🚨 Se llama UserOut porque así lo pide el router de usuarios
+# Se define como UserOut para que el router de usuarios lo encuentre
 class UserOut(UserBase):
     id: int
     class Config:
@@ -28,10 +28,14 @@ class InstitutionBase(BaseModel):
 class InstitutionCreate(InstitutionBase):
     pass
 
-class Institution(InstitutionBase):
+# Se define como InstitutionOut porque el router de instituciones lo pide así
+class InstitutionOut(InstitutionBase):
     id: int
     class Config:
         from_attributes = True
+
+class Institution(InstitutionOut):
+    pass
 
 # --- TICKETS ---
 class TicketBase(BaseModel):
@@ -45,7 +49,7 @@ class TicketBase(BaseModel):
 class TicketCreate(TicketBase):
     pass
 
-# 🚨 Se llama TicketOut porque así lo pide el router de tickets
+# Se define como TicketOut para que el router de tickets funcione
 class TicketOut(TicketBase):
     id: int
     created_at: datetime
@@ -54,7 +58,7 @@ class TicketOut(TicketBase):
     class Config:
         from_attributes = True
 
-# --- ESTADÍSTICAS ---
+# --- ESTADÍSTICAS DEL DASHBOARD ---
 class DashboardStats(BaseModel):
     total_tickets: int
     open_tickets: int
