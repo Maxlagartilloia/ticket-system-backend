@@ -13,7 +13,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
-class User(UserBase):
+# 🚨 CAMBIO AQUÍ: Se llama UserOut para que coincida con lo que pide el router
+class UserOut(UserBase):
     id: int
     class Config:
         from_attributes = True
@@ -52,7 +53,7 @@ class Ticket(TicketBase):
     class Config:
         from_attributes = True
 
-# --- ESTADÍSTICAS DEL DASHBOARD (CRÍTICO) ---
+# --- ESTADÍSTICAS ---
 class DashboardStats(BaseModel):
     total_tickets: int
     open_tickets: int
